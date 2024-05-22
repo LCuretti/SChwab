@@ -190,7 +190,6 @@ class schwabApi():
         # return teh resposnse of the get request.
         return requests.get(url=url, headers=merged_headers, verify = True, timeout = 10).json()
 
-
     #### ACCOUNT
 
     def get_account_numbers(self):
