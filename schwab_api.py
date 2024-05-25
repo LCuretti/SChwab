@@ -158,8 +158,12 @@ class schwabApi():
 
         # define the string representation
         return str(self._auth)
-
+   
+    #################
     #### ACCOUNT DATA
+    #################
+    
+    
     #### User Info & Preferences
 
 
@@ -191,8 +195,9 @@ class schwabApi():
         return requests.get(url=url, headers=merged_headers, verify = True, timeout = 10).json()
 
 
-    #### ACCOUNT
+    #### Account
 
+    
     def get_account_numbers(self):
         '''
         Returns a mapping from account IDs available to this token to the
@@ -205,7 +210,7 @@ class schwabApi():
                             verify = True, timeout = 10).json()
 
 
-    def get_accounts(self, account_hash = None, fields = None):
+    def get_accounts(self, *, account_hash = None, fields = None):
 
         '''
         Account balances, positions, and orders for a specific account.
@@ -253,7 +258,7 @@ class schwabApi():
 
 
 
-    #### TRANSACTION HISTORY
+    #### Transaction History
 
 
     def get_transactions(self, start_date = None, end_date = None, *,account_hash = None, 
@@ -343,7 +348,110 @@ class schwabApi():
 
 
 
-    #### ORDERS
+    #### Orders
+
+    def get_orders_query(self, account = None, max_results = None, from_entered_time = None,
+                         to_entered_time = None, status = None):
+    
+        '''
+        All orders for a specific account or, if account ID isn't specified, orders will be
+        returned for all linked accounts
+    
+        Documentation Link: https://developer.tdameritrade.com/account-access/apis/get/orders-0
+    
+        NAME: account
+        DESC: The account number that you want to query for orders.
+        TYPE: String
+    
+        NAME: max_results
+        DESC: The maximum nymber of orders to receive.
+        TYPE: integer
+    
+        NAME: from_entered_time
+        DESC: Specifies that no orders entered before this time should be returned.
+              Valid ISO-8601 formats are: yyyy-MM-dd and yyyy-MM-dd'T'HH:mm:ssz
+              Date must be within 60 days from today's date. 'toEnteredTime' must also be set.
+        TYPE: string
+    
+        NAME: to_entered_time
+        DESC: Specifies that no orders entered after this time should be returned.
+              Valid ISO-8601 formats are: yyyy-MM-dd and yyyy-MM-dd'T'HH:mm:ssz.
+              'fromEnteredTime' must also be set.
+        TYPE: String
+    
+        NAME: status
+        DESC: Specifies that only orders of this status should be returned. Possible values are:
+    
+                1. AWAITING_PARENT_ORDER
+                2. AWAITING_CONDITION
+                3. AWAITING_MANUAL_REVIEW
+                4. ACCEPTED
+                5. AWAITING_UR_NOT
+                6. PENDING_ACTIVATION
+                7. QUEUED
+                8. WORKING
+                9. REJECTED
+                10. PENDING_CANCEL
+                11. CANCELED
+                12. PENDING_REPLACE
+                13. REPLACED
+                14. FILLED
+                15. EXPIRED
+    
+        EXAMPLES:
+        Object.get_orders_query(account = 'MyAccountID', max_result = 6,
+                                from_entered_time = '2019-10-01', to_entered_tme = '2019-10-10)
+        Object.get_orders_query(account = 'MyAccountID', max_result = 6, status = 'EXPIRED')
+        Object.get_orders_query(account = 'MyAccountID', status ='REJECTED')
+        Object.get_orders_query(account = 'MyAccountID')
+        '''
+        # define the payload
+        account = account or self.account_id
+        data = {"accountId":account,
+                "maxResults": max_results,
+                "fromEnteredTime": from_entered_time,
+                "toEnteredTime": to_entered_time,
+                "status": status}
+    
+        # define teh endpoint
+        endpoint = '/orders'
+    
+        # grab the originbal headers we have stored.
+        url, merged_headers =self._auth.headers(endpoint)
+    
+        #make the request
+        return requests.get(url=url, headers = merged_headers, params = data,
+                            verify = True, timeout = 10).json()
+    
+    
+    def get_all_orders(self, from_entered_datetime=None, to_entered_datetime=None,            
+                       *, max_results=None, status=None):
+            '''Orders for all linked accounts. Optionally specify a single status on 
+            which to filter.
+    
+            :param max_results: The maximum number of orders to retrieve.
+            :param from_entered_datetime: Specifies that no orders entered before
+                                          this time should be returned. Date must
+                                          be within 60 days from today's date.
+                                          ``toEnteredTime`` must also be set.
+            :param to_entered_datetime: Specifies that no orders entered after this
+                                        time should be returned. ``fromEnteredTime``
+                                        must also be set.
+            :param status: Restrict query to orders with this status. See
+                           :class:`Order.Status` for options.
+            '''
+            endpoint = '/trader/v1/orders'
+
+            url, merged_headers = self._auth.headers(endpoint)
+            
+            data = {"maxResults": max_results, "fromEnteredTime": from_entered_datetime,
+                    "toEnteredTime": to_entered_datetime, "status": status}
+            
+            
+            
+            return requests.get(url=url, headers = merged_headers, params = data,
+                                verify = True, timeout = 10).json()
+
 
 
     def get_orders_path(self, account = None, max_results = None, from_entered_time = None,
@@ -419,78 +527,7 @@ class schwabApi():
                             verify = True, timeout = 10).json()
 
 
-    def get_orders_query(self, account = None, max_results = None, from_entered_time = None,
-                         to_entered_time = None, status = None):
-
-        '''
-        All orders for a specific account or, if account ID isn't specified, orders will be
-        returned for all linked accounts
-
-        Documentation Link: https://developer.tdameritrade.com/account-access/apis/get/orders-0
-
-        NAME: account
-        DESC: The account number that you want to query for orders.
-        TYPE: String
-
-        NAME: max_results
-        DESC: The maximum nymber of orders to receive.
-        TYPE: integer
-
-        NAME: from_entered_time
-        DESC: Specifies that no orders entered before this time should be returned.
-              Valid ISO-8601 formats are: yyyy-MM-dd and yyyy-MM-dd'T'HH:mm:ssz
-              Date must be within 60 days from today's date. 'toEnteredTime' must also be set.
-        TYPE: string
-
-        NAME: to_entered_time
-        DESC: Specifies that no orders entered after this time should be returned.
-              Valid ISO-8601 formats are: yyyy-MM-dd and yyyy-MM-dd'T'HH:mm:ssz.
-              'fromEnteredTime' must also be set.
-        TYPE: String
-
-        NAME: status
-        DESC: Specifies that only orders of this status should be returned. Possible values are:
-
-                1. AWAITING_PARENT_ORDER
-                2. AWAITING_CONDITION
-                3. AWAITING_MANUAL_REVIEW
-                4. ACCEPTED
-                5. AWAITING_UR_NOT
-                6. PENDING_ACTIVATION
-                7. QUEUED
-                8. WORKING
-                9. REJECTED
-                10. PENDING_CANCEL
-                11. CANCELED
-                12. PENDING_REPLACE
-                13. REPLACED
-                14. FILLED
-                15. EXPIRED
-
-        EXAMPLES:
-        Object.get_orders_query(account = 'MyAccountID', max_result = 6,
-                                from_entered_time = '2019-10-01', to_entered_tme = '2019-10-10)
-        Object.get_orders_query(account = 'MyAccountID', max_result = 6, status = 'EXPIRED')
-        Object.get_orders_query(account = 'MyAccountID', status ='REJECTED')
-        Object.get_orders_query(account = 'MyAccountID')
-        '''
-        # define the payload
-        account = account or self.account_id
-        data = {"accountId":account,
-                "maxResults": max_results,
-                "fromEnteredTime": from_entered_time,
-                "toEnteredTime": to_entered_time,
-                "status": status}
-
-        # define teh endpoint
-        endpoint = '/orders'
-
-        # grab the originbal headers we have stored.
-        url, merged_headers =self._auth.headers(endpoint)
-
-        #make the request
-        return requests.get(url=url, headers = merged_headers, params = data,
-                            verify = True, timeout = 10).json()
+    
 
 
     def get_order(self, account = None, order_id = None):
@@ -775,11 +812,12 @@ class schwabApi():
 
 
 
+    ################
+    #### MARKET DATA
+    ################
+    
 
-    #### MARKET DATA   
-
-
-    #### INSTRUMENTS
+    #### Instruments
 
 
     def search_instruments(self, symbol = None, projection = 'symbol-search'):
@@ -869,7 +907,7 @@ class schwabApi():
 
    
 
-    ####  MARKET HOURS
+    ####  Market Hours
 
 
     def get_markets_hours(self, markets = "all", date = datetime.now()):
@@ -938,7 +976,7 @@ class schwabApi():
                             verify = True, timeout = 10).json()
 
 
-    #### MOVERS
+    #### Movers
 
 
 
@@ -984,7 +1022,7 @@ class schwabApi():
                             verify = True, timeout = 10).json()
 
 
-    #### QUOTES
+    #### Quotes
 
 
     def get_quotes(self, instruments = None):
@@ -1046,7 +1084,7 @@ class schwabApi():
 
 
 
-    #### PRICE HISTORY
+    #### Price History
 
 
 
@@ -1194,7 +1232,7 @@ class schwabApi():
                             verify = True, timeout = 10).json()
 
 
-    #### OPTION CHAIN
+    #### Option Chain
 
 
     def get_option_chain(self, option_chain = None):
