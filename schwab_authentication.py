@@ -53,6 +53,9 @@ class SchwabAuthentication():
                                                token (default: False).
         """
 
+        if not schwab_config:
+            raise ValueError("schwab_config is required and cannot be empty.")
+
         self._schwab_config = schwab_config
         self._store_refresh_token = store_refresh_token
         self._single_access = single_access
@@ -105,7 +108,7 @@ class SchwabAuthentication():
             self._obtain_refresh_token()
 
 
-#### OBTAIN ACCESS AND REFRESH TOKEN
+#### CODE AND REFRESH TOKEN
 
     def _obtain_access_code(self) -> str:
         """
@@ -169,43 +172,46 @@ class SchwabAuthentication():
         Raises:
             requests.exceptions.RequestException: If an error occurs during the HTTP request.
         """
-
-        url, headers, auth = self._get_request_basic_attributes()
-
         access_code = self._obtain_access_code()
+        if not access_code:
+            logging.error('No access code provided!')
+            return
 
         # define the payload
-        payload = {
-                'client_id': self._schwab_config['client_id'],
-                'grant_type': 'authorization_code',
+        extra_payload = {
                 'redirect_uri':self._schwab_config['redirect_uri'],
                 'code': access_code
                   }
 
-        try:
-            response = requests.post(url, data=payload, headers=headers, auth=auth, timeout=5)
-            response.raise_for_status()  # Raise an exception for non-200 status codes
-        except requests.exceptions.RequestException as err:
-            logging.error('Could not authenticate while getting refresh-token! Error: %s', str(err))
-            self.logged_in_state = False
-            return
+        token_response = self._request_token('authorization_code', extra_payload)
 
-        if response.status_code == 200:
-            token_response = response.json()
+        if token_response:
             self._update_access_token(token_response)
             logging.info(token_response)
             if not self._single_access:
                 self._update_refresh_token(token_response)
+        else:
+            logging.error('Could not authenticate while getting refresh-token!')
+            return
 
 
-    def _get_request_basic_attributes(self):
+#### REQUEST TOKENS
+
+    def _request_token(self, grant_type: str, extra_payload: dict):
         """
-        Returns the basic attributes required for making an HTTP request to the Schwab API.
+        Makes a request to the Schwab API to obtain a token.
+
+        Args:
+            grant_type (str): The type of grant being requested (e.g., 'authorization_code').
+            extra_payload (dict): Additional payload parameters required for the request.
 
         Returns:
-            tuple: A tuple containing the API URL, request headers,
-            and basic authentication credentials.
+            dict: The response JSON containing token information if the request is successful.
+
+        Raises:
+            requests.exceptions.RequestException: If an error occurs during the HTTP request.
         """
+
 
         url = r'https://api.schwabapi.com/v1/oauth/token'
         headers = {
@@ -214,11 +220,21 @@ class SchwabAuthentication():
                 }
         auth = (self._schwab_config['client_id'],self._schwab_config['app_secret'])
 
+        payload = {'client_id': self._schwab_config['client_id'],
+                   'grant_type': grant_type}
+        payload.update(extra_payload)
 
-        return url, headers, auth
+        try:
+            response = requests.post(url, data=payload, headers=headers, auth=auth, timeout=5)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as err:
+            logging.error('Could not authenticate! Error: %s', str(err))
+            self.logged_in_state = False
+            return None
 
 
-#### OBTAIN ACCESS TOKEN
+#### ACCESS TOKEN
 
     def _obtain_access_token(self) -> requests.Response:
         """
@@ -229,44 +245,20 @@ class SchwabAuthentication():
             the refreshed access token information.
         """
 
-        url, headers, auth = self._get_request_basic_attributes()
-
-        payload = {
-                'client_id': self._schwab_config['client_id'],
-                'grant_type': 'refresh_token',
+        extra_payload = {
                 'refresh_token': self._tokens['refresh_token']
                 }
 
-        response = requests.post(url, data=payload, headers=headers, auth=auth, timeout=5)
+        token_response = self._request_token('refresh_token', extra_payload)
 
-        if response.status_code == 200:
-            token_response = response.json()
+        if token_response:
             self._update_access_token(token_response)
         else:
-            logging.error('Could not authenticate while refreshing token! Status code: %s',
-                          response.status_code)
-            self.logged_in_state = False
+            logging.error('Could not authenticate while refreshing token!')
             self._obtain_refresh_token()
 
 
-    def _refresh_access_token(self):
-        """
-        Refreshes the access token if it is nearing expiration.
 
-        This method checks the expiration time of the refresh token. If the refresh token
-        is within one day of expiring, a warning message is logged. Additionally, if the
-        access token itself is about to expire (within 5 seconds), this method will
-        attempt to refresh the access token using the refresh token.
-
-        **Note:** This method is typically called periodically (e.g., every 30 minutes)
-        to ensure a valid access token is available for API calls.
-        """
-        if self._tokens['refresh_expiration'] - timedelta(days = 1) < datetime.now():
-            logging.warning('Refresh Token is almost expired or expired. Expiration: %s',
-                          str(self._tokens['refresh_expiration'])[:22])
-            self._obtain_refresh_token()
-        else:
-            self._obtain_access_token()
 
 
     def _update_access_token(self, token_response: dict):
@@ -300,6 +292,25 @@ class SchwabAuthentication():
 
 
 #### AUTHENTICATE
+    def _refresh_access_token(self):
+        """
+        Refreshes the access token if it is nearing expiration.
+
+        This method checks the expiration time of the refresh token. If the refresh token
+        is within one day of expiring, a warning message is logged. Additionally, if the
+        access token itself is about to expire (within 5 seconds), this method will
+        attempt to refresh the access token using the refresh token.
+
+        **Note:** This method is typically called periodically (e.g., every 30 minutes)
+        to ensure a valid access token is available for API calls.
+        """
+        if self._tokens['refresh_expiration'] - timedelta(days = 1) < datetime.now():
+            logging.warning('Refresh Token is almost expired or expired. Expiration: %s',
+                          str(self._tokens['refresh_expiration'])[:22])
+            self._obtain_refresh_token()
+        else:
+            self._obtain_access_token()
+
 
     def _authenticate(self):
         """
@@ -326,61 +337,26 @@ class SchwabAuthentication():
             self._refresh_access_token()
 
 #### PUBLIC SERVICES
-
-    def get_url_and_headers(self, endpoint: str, content_type: str = None) -> tuple:
+    def get_headers(self):
         """
-        Provides the URL and headers required for making authenticated API calls to Schwab.
+        Returns the headers required for authenticated API calls.
 
-        This method first calls the `_authenticate` method to ensure a valid access token
-        is available. If authentication is successful, it constructs the full API URL based
-        on the provided endpoint (either a relative path or a full URL).
+        This method calls `_authenticate` to ensure a valid access token is available.
+        If authentication is successful, it returns the headers with the access token.
+        Otherwise, it logs an error and returns None.
 
-        **Arguments:**
-
-        * endpoint (str): The API endpoint to access. It can be a relative path (e.g.,
-          'quotes') or a full URL.
-        * content_type (str, optional): The content type for the request. Defaults to
-          `None`. If set to `'application/json'`, the `Accept` header is also set to
-          `'application/json'`.
-
-        **Returns:**
-
-        * tuple: A tuple containing two elements:
-            * url (str): The complete URL for the API call.
-            * headers (dict): A dictionary containing the required HTTP headers for the request,
-              including the `Authorization` header with the access token.
-
-        **Raises:**
-
-        * None: This method doesn't raise any exceptions directly. However, if
-          authentication fails (`self.logged_in_state` is False), it logs an error message
-          and returns `None, None`.
+        Returns:
+            dict: Headers containing the authorization bearer token.
+            None: If authentication fails.
         """
 
         self._authenticate()
 
         if self.logged_in_state:
-            #Convert relative endpoint (e.g.,  'quotes') to full API endpoint.
-
-            # if they pass through a valid url then, just use that.
-            if up.urlparse(endpoint).scheme in ['http', 'https']:
-                url = endpoint
-            else:
-            # otherwise build the URL
-                url = up.urljoin('https://api.schwabapi.com/trader/v1/', endpoint.lstrip('/'))
-
-            # create the headers dictionary
-            headers ={'Authorization':f'Bearer {self._tokens["access_token"]}'}
-
-            # if mode 'application/json' for request PUT, PATCH and POST
-            if content_type == 'application/json':
-                headers['Accept'] = 'application/json'
-
-            return url, headers
+            return {'Authorization':f'Bearer {self._tokens["access_token"]}'}
 
         logging.error('Wrong authentication')
-        return None, None
-
+        return None
 
     @property
     def access_token(self) -> str:
@@ -389,6 +365,9 @@ class SchwabAuthentication():
 
         This property calls the `_authenticate` method to ensure a valid access token
         is available before returning it. If authentication fails, the property returns `False`.
+        Returns:
+            str: The access token if authentication is successful.
+            False: If authentication fails.
         """
 
         self._authenticate()
