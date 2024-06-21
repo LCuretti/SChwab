@@ -13,7 +13,11 @@ import requests
 from schwab_authentication import SchwabAuthentication
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+if not logging.root.handlers:
+    print("No loggin handler at API.py")
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+
 logger = logging.getLogger(__name__)
 
 BASE_MARKET_URL = 'https://api.schwabapi.com/marketdata/v1/'
@@ -65,17 +69,17 @@ class SchwabApi():
         It will be use in the headers method to send a valid token.
         '''
 
-        self._auth = SchwabAuthentication(schwab_cfg)
+        self.auth = SchwabAuthentication(schwab_cfg)
 
         #self._auth.authenticate()
-        if self._auth:
+        if self.auth:
             self.principals = self.get_user_preference()
             accounts = self.get_account_numbers()
             self.account_hash = accounts[0]['hashValue']
 
-            logger.info("Schwab API Initialized at: %s", str(datetime.now()))
+            logger.info("Schwab API Initialized")
         else:
-            print("Could not authenticate")
+            logger.warning("Could not authenticate")
 
 
     def __repr__(self):
@@ -84,11 +88,11 @@ class SchwabApi():
         '''
 
         # define the string representation
-        return str(self._auth)
+        return str(self.auth)
 
 
     def _make_request(self, method, base_url, endpoint, additional_headers = None, **kwargs):
-        headers = self._auth.get_headers()
+        headers = self.auth.get_headers()
         if additional_headers:
             headers.update(additional_headers)
         url = up.urljoin(base_url, endpoint.lstrip('/'))

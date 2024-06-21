@@ -13,6 +13,13 @@ import logging
 from datetime import datetime, timedelta
 import requests
 
+if not logging.root.handlers:
+    print("No loggin handler at Authentication")
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+
+logger = logging.getLogger(__name__)
+
 class SchwabAuthentication():
 
     """
@@ -67,9 +74,8 @@ class SchwabAuthentication():
                        }
 
         self.logged_in_state = False
-        self._initialize_logging()
         self._initialize_authentication()
-        logging.info("Schwab authentication initialized at %s", datetime.now())
+        logger.info("Schwab authentication initialized")
 
     def __repr__(self):
         """
@@ -82,12 +88,6 @@ class SchwabAuthentication():
             self.logged_in_state = False
         return str(self.logged_in_state)
 
-    def _initialize_logging(self):
-        """
-        Initializes basic logging configuration for informational messages.
-        """
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-        logging.info("Schwab authentication initialized")
 
     def _initialize_authentication(self):
         """
@@ -174,7 +174,7 @@ class SchwabAuthentication():
         """
         access_code = self._obtain_access_code()
         if not access_code:
-            logging.error('No access code provided!')
+            logger.error('No access code provided!')
             return
 
         # define the payload
@@ -187,11 +187,11 @@ class SchwabAuthentication():
 
         if token_response:
             self._update_access_token(token_response)
-            logging.info(token_response)
+            logger.info(token_response)
             if not self._single_access:
                 self._update_refresh_token(token_response)
         else:
-            logging.error('Could not authenticate while getting refresh-token!')
+            logger.error('Could not authenticate while getting refresh-token!')
             return
 
 
@@ -229,7 +229,7 @@ class SchwabAuthentication():
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as err:
-            logging.error('Could not authenticate! Error: %s', str(err))
+            logger.error('Could not authenticate! Error: %s', str(err))
             self.logged_in_state = False
             return None
 
@@ -254,7 +254,7 @@ class SchwabAuthentication():
         if token_response:
             self._update_access_token(token_response)
         else:
-            logging.error('Could not authenticate while refreshing token!')
+            logger.error('Could not authenticate while refreshing token!')
             self._obtain_refresh_token()
 
 
@@ -305,7 +305,7 @@ class SchwabAuthentication():
         to ensure a valid access token is available for API calls.
         """
         if self._tokens['refresh_expiration'] - timedelta(days = 1) < datetime.now():
-            logging.warning('Refresh Token is almost expired or expired. Expiration: %s',
+            logger.warning('Refresh Token is almost expired or expired. Expiration: %s',
                           str(self._tokens['refresh_expiration'])[:22])
             self._obtain_refresh_token()
         else:
@@ -355,7 +355,7 @@ class SchwabAuthentication():
         if self.logged_in_state:
             return {'Authorization':f'Bearer {self._tokens["access_token"]}'}
 
-        logging.error('Wrong authentication')
+        logger.error('Wrong authentication')
         return None
 
     @property
