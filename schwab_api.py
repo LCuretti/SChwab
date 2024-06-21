@@ -2,96 +2,27 @@
 """
 Created on Thu Nov  7 08:23:24 2019
 
-The MIT License
-
-Copyright (c) 2018 Addison Lynch
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
 @author: LC
-Based on areed1192 / td-ameritrade-python-api
-
-
-Method Type 	Method						Type 	Header								Endpoint
-Authentication	Post Access Token			POST 	None						   /oauth2/token
-
-User Info and Get User Principals 			  GET 	Bearer<token>				   /userprincipals
-Preferennces  Get Streamer Subs. Keys 		  GET 	Bearer<token>			   	   /userprincipals/streamersubscriptionkeys
-			  Get Preferences 				  GET 	Bearer<token>				   /accounts/{accountId}/preferences
-			  Update Preferences			  PUT 	Bearer<token>+application/json /accounts/{accountId}/preferences
-
-Accounts	  Get Accounts					  GET 	Bearer<token>				   /accounts
-			  Get Account 					  GET 	Bearer<token>				   /accounts/{accountId}
-
-Orders		  Get Order by Query			  GET 	Bearer<token>				   /orders
-			  Get Order by Path				  GET 	Bearer<token>				   /accounts/{accountId}/orders
-			  Get Order						  GET 	Bearer<token>				   /accounts/{accountId}/orders/{orderId}
-			  Cancel Order					 DELETE Bearer<token>				   /accounts/{accountId}/orders/{orderId}
-			  Place Order 					  POST	Bearer<token>+application/json /accounts/{accountId}/orders
-			  Replace Order					  PUT 	Bearer<token>+application/json /accounts/{accountId}/orders/{orderId}
-
-Saved Orders  Get Saved Orders by Path		  GET 	Bearer<token>				   /accounts/{accountId}/
-                                                                                    savedorders
-			  Get Saved Order 				  GET 	Bearer<token>				   /accounts/{accountId}/savedorders/{savedorderId}
-			  Cancel Saved Order			 DELETE	Bearer<token>				   /accounts/{accountId}/savedorders/{savedorderId}
-			  Create Saved Order			  POST	Bearer<token>+application/json /accounts/{accountId}/
-                                                                                      savedorders
-			  Replace Saved Order 			  PUT 	Bearer<token>+application/json /accounts/{accountId}/savedorders/{savedorderId}
-
-Transactions  Get Transaction 				  GET 	Bearer<token>				   /accounts/{accountId}/
-                                                                                    transactions/
-History 	  Get Transactions				  GET 	Bearer<token>				   /accounts/{accountId}/
-                                                                                    transactions/
-
-Watchlist	  Get Multiple Accounts Watchlist GET 	Bearer<token>				   /accounts/watchlists
-			  Get Single Account Watchlist	  GET 	Bearer<token>				   /accounts/{accountId}/
-                                                                                     watchlists
-			  Get Watchlist 				  GET 	Bearer<token>				   /accounts/{accountId}/watchlists/{watchlistId}
-			  Delete Watchlist				 DELETE	Bearer<token>				   /accounts/{accountId}/watchlists/{watchlistId}
-			  Create Watchlist				  POST 	Bearer<token>+application/json /accounts/{accountId}/
-                                                                                     watchlists
-			  Replace Watchlist				  PUT 	Bearer<token>+application/json /accounts/{accountId}/watchlists/{watchlistId}
-			  Update Watchlist				  PATCH	Bearer<token>+application/json /accounts/{accountId}/watchlists/{watchlistId}
-
-Instruments	  Search Instruments		  	  GET 	Bearer<token>				   /instruments
-			  Get Instrument				  GET 	Bearer<token>				   /instruments/{cusip}
-
-Market Hours  Get Hours for Multiple Markets  GET 	Bearer<token>				   /marketdata/hours
-			  Get Hours for a Single Market	  GET 	Bearer<token>				   /marketdata/{market}/hours
-
-Movers		  Get Movers					  GET 	Bearer<token>				   /marketdata/{index}/movers
-
-Option Chains Get Option Chain				  GET 	Bearer<token>				   /marketdata/chains
-
-Price History Get Price History				  GET 	Bearer<token>				   /marketdata/{symbol}/
-                                                                                    pricehistory
-
-Quotes		  Get Quote						  GET 	Bearer<token>				   /marketdata/{symbol}/quotes
-			  Get Quotes					  GET 	Bearer<token>			       /marketdata/quotes
 """
-
-
 
 from datetime import datetime
 import json
+import urllib.parse as up
+import logging
 import requests
-from schwab_authentication import schwabAuthentication
+from schwab_authentication import SchwabAuthentication
+
+
+if not logging.root.handlers:
+    print("No loggin handler at API.py")
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+
+logger = logging.getLogger(__name__)
+
+BASE_MARKET_URL = 'https://api.schwabapi.com/marketdata/v1/'
+BASE_TRADER_URL = 'https://api.schwabapi.com/trader/v1/'
+ADDITIONAL_HEADERS = {'Accept':'application/json'}
 
 
 def prepare_parameter_list(parameter_list = None):
@@ -120,7 +51,7 @@ def prepare_parameter_list(parameter_list = None):
     return parameter_list
 
 
-class schwabApi():
+class SchwabApi():
     '''
 	TD Ameritrade API Class.
 
@@ -138,17 +69,17 @@ class schwabApi():
         It will be use in the headers method to send a valid token.
         '''
 
-        self._auth = schwabAuthentication(schwab_cfg)
+        self.auth = SchwabAuthentication(schwab_cfg)
 
         #self._auth.authenticate()
-        if self._auth:
+        if self.auth:
             self.principals = self.get_user_preference()
             accounts = self.get_account_numbers()
             self.account_hash = accounts[0]['hashValue']
 
-            print("Schwab API Initialized at:".ljust(50)+str(datetime.now()))
+            logger.info("Schwab API Initialized")
         else:
-            print("Could not authenticate")
+            logger.warning("Could not authenticate")
 
 
     def __repr__(self):
@@ -157,9 +88,28 @@ class schwabApi():
         '''
 
         # define the string representation
-        return str(self._auth)
+        return str(self.auth)
 
+
+    def _make_request(self, method, base_url, endpoint, additional_headers = None, **kwargs):
+        headers = self.auth.get_headers()
+        if additional_headers:
+            headers.update(additional_headers)
+        url = up.urljoin(base_url, endpoint.lstrip('/'))
+
+        try:
+            response = method(url, headers=headers, verify=True, timeout=10, **kwargs)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as error:
+            logger.error("Error: %s", error)
+            return None
+
+
+    #################
     #### ACCOUNT DATA
+    #################
+
     #### User Info & Preferences
 
 
@@ -180,17 +130,13 @@ class schwabApi():
         Object.get_preferences(account = 'MyAccountNumber')
         '''
 
-
-        #define the endpoint
         endpoint = '/userPreference'
 
-        #grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
+        return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
 
-        # return teh resposnse of the get request.
-        return requests.get(url=url, headers=merged_headers, verify = True, timeout = 10).json()
 
-    #### ACCOUNT
+    #### Account
+
 
     def get_account_numbers(self):
         '''
@@ -199,12 +145,11 @@ class schwabApi():
         API calls.
         '''
         endpoint = '/accounts/accountNumbers'
-        url, merged_headers = self._auth.headers(endpoint)
-        return requests.get(url, headers = merged_headers,
-                            verify = True, timeout = 10).json()
+
+        return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
 
 
-    def get_accounts(self, account_hash = None, fields = None):
+    def get_accounts(self, *, account_hash = None, fields = None):
 
         '''
         Account balances, positions, and orders for a specific account.
@@ -243,19 +188,13 @@ class schwabApi():
         else:
             endpoint = '/accounts'
 
-        #grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
-
-        #return the response of the get request.
-        return requests.get(url = url, headers = merged_headers, params = params,
-                            verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
 
 
+    #### Transaction History
 
-    #### TRANSACTION HISTORY
 
-
-    def get_transactions(self, start_date = None, end_date = None, *,account_hash = None, 
+    def get_transactions(self, start_date, end_date, *, account_hash = None,
                           transaction_types = None, symbol = None, transaction_id = None):
 
         '''
@@ -304,49 +243,55 @@ class schwabApi():
         Object.get_transactions(transaction_id = 'MyTransactionID')
         '''
 
-        #grab the original headers we have stored.
-
-
         account_hash = account_hash or self.account_hash
-
-        # if transaction_id is not made, it means will need to make a request
-        # to the get_transaction endpoint.
 
         if transaction_id:
 
-            #define the endpoint:
             endpoint = f'/accounts/{account_hash}/transactions/{transaction_id}'
 
+            return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
 
-            url, merged_headers = self._auth.headers(endpoint)
-
-            # return the response of the get request
-            return requests.get(url = url, headers=merged_headers,
-                                verify = True, timeout = 10).json()
-
-        # if it isn't then we need to make a request to the get_transactions endpoint.
-        #build the params dictionary
-        data = {'types':transaction_types,
+        params = {'types':transaction_types,
                 'symbol':symbol,
                 'startDate':start_date,
                 'endDate':end_date}
 
-        #define the endpoint
         endpoint = f'/accounts/{account_hash}/transactions'
 
-        url, merged_headers = self._auth.headers(endpoint)
-
-        # return the response of the get request
-        return requests.get(url= url, headers = merged_headers, params=data,
-                            verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
 
 
+    #### Orders
 
-    #### ORDERS
+    def get_orders(self, from_entered_datetime, to_entered_datetime,
+                       *, max_results=None, status=None):
+        '''Orders for all linked accounts. Optionally specify a single status on
+        which to filter.
+
+        :param max_results: The maximum number of orders to retrieve.
+        :param from_entered_datetime: Specifies that no orders entered before
+                                      this time should be returned. Date must
+                                      be within 60 days from today's date.
+                                      ``toEnteredTime`` must also be set.
+        :param to_entered_datetime: Specifies that no orders entered after this
+                                    time should be returned. ``fromEnteredTime``
+                                    must also be set.
+        :param status: Restrict query to orders with this status. See
+                       :class:`Order.Status` for options.
+        '''
+        endpoint = '/orders'
+
+        params = {"maxResults": max_results,
+                "fromEnteredTime": from_entered_datetime,
+                "toEnteredTime": to_entered_datetime,
+                "status": status}
+
+        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
 
 
-    def get_orders_path(self, account = None, max_results = None, from_entered_time = None,
-                        to_entered_time = None, status = None):
+
+    def get_account_orders(self, from_entered_time, to_entered_time, *, account_hash = None,
+                           max_results = None, status = None):
 
         '''
         Returns the savedorders for a specific account.
@@ -402,97 +347,19 @@ class schwabApi():
         Object.get_orders_path(account = 'MyAccountID')
         '''
 
-        # define the payload
-        data = {"maxResults": max_results, "fromEnteredTime": from_entered_time,
-                "toEnteredTime": to_entered_time, "status": status}
+        account_hash = account_hash or self.account_hash
 
-        #define the endpoint
-        account = account or self.account_id
-        endpoint = f'/accounts/{account}/orders'
-
-        # grab the originbal headers we have stored.
-        url, merged_headers =self._auth.headers(endpoint)
-
-        #make the request
-        return requests.get(url=url, headers = merged_headers, params = data,
-                            verify = True, timeout = 10).json()
-
-
-    def get_orders_query(self, account = None, max_results = None, from_entered_time = None,
-                         to_entered_time = None, status = None):
-
-        '''
-        All orders for a specific account or, if account ID isn't specified, orders will be
-        returned for all linked accounts
-
-        Documentation Link: https://developer.tdameritrade.com/account-access/apis/get/orders-0
-
-        NAME: account
-        DESC: The account number that you want to query for orders.
-        TYPE: String
-
-        NAME: max_results
-        DESC: The maximum nymber of orders to receive.
-        TYPE: integer
-
-        NAME: from_entered_time
-        DESC: Specifies that no orders entered before this time should be returned.
-              Valid ISO-8601 formats are: yyyy-MM-dd and yyyy-MM-dd'T'HH:mm:ssz
-              Date must be within 60 days from today's date. 'toEnteredTime' must also be set.
-        TYPE: string
-
-        NAME: to_entered_time
-        DESC: Specifies that no orders entered after this time should be returned.
-              Valid ISO-8601 formats are: yyyy-MM-dd and yyyy-MM-dd'T'HH:mm:ssz.
-              'fromEnteredTime' must also be set.
-        TYPE: String
-
-        NAME: status
-        DESC: Specifies that only orders of this status should be returned. Possible values are:
-
-                1. AWAITING_PARENT_ORDER
-                2. AWAITING_CONDITION
-                3. AWAITING_MANUAL_REVIEW
-                4. ACCEPTED
-                5. AWAITING_UR_NOT
-                6. PENDING_ACTIVATION
-                7. QUEUED
-                8. WORKING
-                9. REJECTED
-                10. PENDING_CANCEL
-                11. CANCELED
-                12. PENDING_REPLACE
-                13. REPLACED
-                14. FILLED
-                15. EXPIRED
-
-        EXAMPLES:
-        Object.get_orders_query(account = 'MyAccountID', max_result = 6,
-                                from_entered_time = '2019-10-01', to_entered_tme = '2019-10-10)
-        Object.get_orders_query(account = 'MyAccountID', max_result = 6, status = 'EXPIRED')
-        Object.get_orders_query(account = 'MyAccountID', status ='REJECTED')
-        Object.get_orders_query(account = 'MyAccountID')
-        '''
-        # define the payload
-        account = account or self.account_id
-        data = {"accountId":account,
-                "maxResults": max_results,
+        params = {"maxResults": max_results,
                 "fromEnteredTime": from_entered_time,
                 "toEnteredTime": to_entered_time,
                 "status": status}
 
-        # define teh endpoint
-        endpoint = '/orders'
+        endpoint = f'/accounts/{account_hash}/orders'
 
-        # grab the originbal headers we have stored.
-        url, merged_headers =self._auth.headers(endpoint)
-
-        #make the request
-        return requests.get(url=url, headers = merged_headers, params = data,
-                            verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
 
 
-    def get_order(self, account = None, order_id = None):
+    def get_order(self, order_id, account_hash = None):
 
         '''
         Get a specific order for a specific account.
@@ -511,17 +378,15 @@ class schwabApi():
         Session.Object.get_order(account = 'MyAccountID', order_id_ 'MyOrderID')
         '''
 
+        account_hash = account_hash or self.account_hash
         #define the endpoint
-        account = account or self.account_id
-        endpoint = f'/accounts/{account}/orders/{order_id}'
 
-        # grab the originbal headers we have stored.
-        url, merged_headers =self._auth.headers(endpoint)
+        endpoint = f'/accounts/{account_hash}/orders/{order_id}'
 
-        #make the request
-        return requests.get(url=url, headers = merged_headers, verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
 
-    def cancel_order(self, account = None, order_id = None):
+
+    def cancel_order(self, order_id, account_hash = None):
 
         '''
         Cancel specific order for a specific account.
@@ -543,14 +408,12 @@ class schwabApi():
         '''
 
         #define the endpoint
-        account = account or self.account_id
-        endpoint = f'/accounts/{account}/orders/{order_id}'
-
-        # grab the originbal headers we have stored.
-        url, merged_headers =self._auth.headers(endpoint)
+        account_hash = account_hash or self.account_hash
+        endpoint = f'/accounts/{account_hash}/orders/{order_id}'
 
         #make the request
-        response = requests.delete(url=url, headers = merged_headers, verify = True, timeout = 10)
+        response = self._make_request(requests.delete, BASE_TRADER_URL, endpoint)
+
 
         if response.status_code == 200:
             return print(f"Order {order_id} was successfully CANCELED.\n")
@@ -558,9 +421,9 @@ class schwabApi():
         return print(response.content)
 
 
-    def create_order(self, account = None, symbol = None, price = None, quantity = '0',
-                     instruction = None, asset_type = None, order_type = 'MARKET',
-                     session = 'NORMAL', duration = 'DAY', order_strategy_type = 'SINGLE'):
+    def place_order(self,  symbol,  quantity, instruction, asset_type, price = None,
+                    account_hash = None, order_type = 'MARKET', session = 'NORMAL',
+                    duration = 'DAY', order_strategy_type = 'SINGLE'):
 
         '''
         Create order. This method does not verify that the symbol or assets type are valid.
@@ -647,15 +510,11 @@ class schwabApi():
               }
 
         # define the endpoint
-        account = account or self.account_id
-        endpoint = f'/accounts/{account}/orders'
+        account_hash = account_hash or self.account_hash
+        endpoint = f'/accounts/{account_hash}/orders'
 
-        #grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint, mode = 'application/json')
-
-        #make the request
-        response = requests.post(url = url, headers = merged_headers, data = json.dumps(payload),
-                                 verify = True, timeout = 10)
+        response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
+                                      ADDITIONAL_HEADERS, data = json.dumps(payload))
 
         if response.status_code == 201:
             return print(f"New {symbol} order was successfully created.\n")
@@ -663,72 +522,9 @@ class schwabApi():
         return print(response.content)
 
 
-    def replace_order(self, account = None, order_id = None, symbol = None, price = None,
-                      quantity = 0, instruction = None, asset_type = None, order_type = 'MARKET',
+    def replace_order(self,  order_id, symbol, quantity, instruction, asset_type,
+                      price = None, account_hash = None, order_type = 'MARKET',
                       session = 'NORMAL', duration = 'DAY', order_strategy_type = 'SINGLE'):
-
-        '''
-        Replace an existing order for an account. The existing order will be replaced by the new
-        order. Once replaced,        the old order will be canceled and a new order will be created.
-
-        Documentation Link:
-        https://developer.tdameritrade.com/account-access/apis/put/accounts/%7BaccountId%7D/
-        orders/%7BorderId%7D-0
-
-        NAME: account
-        DESC: The account number you wish to create the watchlist for.
-        TYPE: String
-
-        NAME: order_Id
-        DESC: Order to be replaced
-        TYPE: String
-
-        NAME: symbol
-        DESC: Symbol to operate with.
-        TYPE: String
-
-        NAME: price
-        DESC: price level for the order. If orderType is Market leave it in None
-        TYPE: String
-
-        NAME: quantity
-        DESC: amount of shares to operate
-        TYPE: String
-
-        NAME: intruction
-        DESC: "'BUY' or 'SELL' or 'BUY_TO_COVER' or 'SELL_SHORT' or 'BUY_TO_OPEN' or
-               'BUY_TO_CLOSE' or 'SELL_TO_OPEN' or 'SELL_TO_CLOSE' or 'EXCHANGE'"
-        TYPE: String
-
-        NAME: assetType
-        DESC: "'EQUITY' or 'OPTION' or 'INDEX' or 'MUTUAL_FUND' or 'CASH_EQUIVALENT' or
-              'FIXED_INCOME' or 'CURRENCY'"
-        TYPE: String
-
-        NAME: orderType
-        DESC: "'MARKET' or 'LIMIT' or 'STOP' or 'STOP_LIMIT' or 'TRAILING_STOP' or 'MARKET_ON_CLOSE'
-              or 'EXERCISE' or 'TRAILING_STOP_LIMIT' or 'NET_DEBIT' or 'NET_CREDIT' or 'NET_ZERO'"
-        TYPE: String
-
-        NAME: session
-        DESC: "'NORMAL' or 'AM' or 'PM' or 'SEAMLESS'"
-        TYPE: String
-
-        NAME: duration
-        DESC: "'DAY' or 'GOOD_TILL_CANCEL' or 'FILL_OR_KILL'"
-        TYPE: String
-
-        NAME: orderStrategyType
-        DESC: "'SINGLE' or 'OCO' or 'TRIGGER'"
-        TYPE: String
-
-
-        EXAMPLES:
-        Object.replace_order(account = 'MyAccountNumber', order_Id = 'MyOrderID', symbol = 'MELI',
-                             price = '101.00', quantity = '50', instruction = 'BUY',
-                             assetType = 'EQUITY', orderType = 'LIMIT', session = 'NORMAL',
-                             duration = 'DAY', orderStrategyType = 'SINGLE')
-        '''
 
         #define the payload
         if order_type[:6] == 'MARKET':
@@ -756,16 +552,11 @@ class schwabApi():
               }
 
         # define the endpoint
-        account = account or self.account_id
-        endpoint = f'/accounts/{account}/orders/{order_id}'
+        account_hash = account_hash or self.account_hash
+        endpoint = f'/accounts/{account_hash}/orders/{order_id}'
 
-
-        #grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint, mode = 'application/json')
-
-        #make the request
-        response = requests.put(url = url, headers = merged_headers, data = json.dumps(payload),
-                                verify = True, timeout = 10)
+        response = self._make_request(requests.put, BASE_TRADER_URL, endpoint,
+                                      ADDITIONAL_HEADERS, data = json.dumps(payload))
 
         if response.status_code == 201:
             return print(f"Order {order_id} was successfully replaced.\n")
@@ -773,15 +564,57 @@ class schwabApi():
         return print(response.content)
 
 
+    def preview_order(self,  symbol, quantity, instruction, asset_type, price = None,
+                      account_hash = None, order_type = 'MARKET', session = 'NORMAL',
+                      duration = 'DAY', order_strategy_type = 'SINGLE'):
 
 
-    #### MARKET DATA   
+        #define the payload
+        if order_type[:6] == 'MARKET':
+            price = None
+
+        if order_type != 'STOP':
+            price_type = 'price'
+        else:
+            price_type = 'stopPrice'
 
 
-    #### INSTRUMENTS
+        payload = {'orderType':order_type,
+                   'session':session,
+                   f'{price_type}': price,
+                   'duration':duration,
+                   'orderStrategyType':order_strategy_type,
+                   'orderLegCollection':[
+                                         {'instruction':instruction,
+                                          'quantity':quantity,
+                                          'instrument':{'symbol':symbol,
+                                                        'assetType':asset_type
+                                                       }
+                                         }
+                                        ]
+              }
+
+        account_hash = account_hash or self.account_hash
+        endpoint = f'/accounts/{account_hash}/previewOrder'
+
+        response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
+                                      ADDITIONAL_HEADERS, data = json.dumps(payload))
+
+        if response.status_code == 201:
+            return print(f"New {symbol} preview order was successfully created.\n")
+
+        return print(response.content)
 
 
-    def search_instruments(self, symbol = None, projection = 'symbol-search'):
+
+    ################
+    #### MARKET DATA
+    ################
+
+
+    #### Instruments
+
+    def search_instruments(self, symbol, projection = 'symbol-search'):
 
         '''
         Search or retrive instrument data, including fundamental data.
@@ -823,24 +656,21 @@ class schwabApi():
         Object.search_instruments(symbol = 'FakeCompany', projection = 'desc-search')
         Object.search_instruments(symbol = 'XYZ.[A-C]', projection = 'desc-regex')
         Object.search_instruments(symbol = 'XYZ.[A-C]', projection = 'fundamental')
+        Object.search_instruments(symbol = 'XYZ.[A-C]', projection = 'search')
         '''
 
         # build the params dictionary
-        data = {'symbol':symbol,
+        params = {'symbol':symbol,
                 'projection':projection}
 
         #define the endpoint
         endpoint = '/instruments'
 
-        # grab the original  headers we have stored
-        url, merged_headers = self._auth.headers(endpoint)
-
         # return the response of the get request.
-        return requests.get(url=url, headers=merged_headers, params=data,
-                            verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-    def get_instruments(self, cusip = None):
+    def get_instruments(self, cusip_id):
 
         '''
         Get an instrument by CUSIP (Committe on Uniform Securities Identification PRocedures) code.
@@ -857,21 +687,14 @@ class schwabApi():
         '''
 
         #define the endpoint
-        endpoint = '/instruments'
-
-        #grab the original headers we have stored
-        url, merged_headers = self._auth.headers(endpoint)
-        url = url + "/" + cusip
+        endpoint = f'/instruments/{cusip_id}'
 
         # return the resposne of the get request.
-        return requests.get(url = url, headers=merged_headers, verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint)
 
-   
+    ####  Market Hours
 
-    ####  MARKET HOURS
-
-
-    def get_markets_hours(self, markets = "all", date = datetime.now()):
+    def get_markets_hours(self, markets = "all", date = None):
 
         '''
         Retrieve market hours for specified markets
@@ -890,22 +713,15 @@ class schwabApi():
 
         markets = prepare_parameter_list(markets)
 
-        data = {'markets': markets,
+        params = {'markets': markets,
                 'date': date}
 
-        # define the endpoint
-        endpoint = '/marketdata/hours'
+        endpoint = '/markets'
+
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-        #grab the originsal headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
-
-        # return the response of the get request.
-        return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 10).json()
-
-
-    def get_market_hours(self, market = None, date = datetime.now()):
+    def get_market_hours(self, market_id, date = None):
 
         '''
         Serves as the mechanism to make a request to the
@@ -923,25 +739,16 @@ class schwabApi():
         Object.get_market_hours(market = 'EQUITY')
         '''
 
-        data = {'date': date}
+        params = {'date': date}
+
+        endpoint = f'/markets/{market_id}'
+
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-        # define the endpoint
-        endpoint = f'/marketdata/{market}/hours'
+    #### Movers
 
-        #grab the originsal headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
-
-        # return the response of the get request.
-        return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 10).json()
-
-
-    #### MOVERS
-
-
-
-    def get_movers(self, market = None, direction = None, change = None):
+    def get_movers(self, index, *, sort = None, frequency = None):
 
         '''
         Top 10 (up or down) movers by value or percent for a particular index.
@@ -968,25 +775,18 @@ class schwabApi():
 
         '''
 
-        # build the params dictionary
-        data = {'direction': direction,
-                'change':change}
+        params = {'sort': sort,
+                  'frequency':frequency}
 
-        # define teh endpoint
-        endpoint = f'/marketdata/{market}/movers'
+        endpoint = f'/movers/{index}'
 
-        # grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
-
-        #return the response of the request.
-        return requests.get(url=url, headers=merged_headers, params=data,
-                            verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-    #### QUOTES
+    #### Quotes
 
 
-    def get_quotes(self, instruments = None):
+    def get_quotes(self, symbols, fields = None, indicative = 'false'):
 
         '''
         Serves as the mechanism to make a request to Get Quotes Endpoint.
@@ -1000,57 +800,34 @@ class schwabApi():
         EXAMPLE:
         Object.get_quotes(intruments = ['MSFT'])
         Object.get_quotes(instruments = ['MSFT', 'SQ'])
+
+        fields = quote, fundamental, extended, reference, regular  default = all
         '''
 
-        # becasue we have a list argument, prep it for the request.
-        instruments = prepare_parameter_list(parameter_list = instruments)
+        symbols = prepare_parameter_list(parameter_list = symbols)
 
-        # buikld the params dictionary
-        data = {'symbol':instruments}
+        params = {'symbol': symbols,
+                  'fields': fields,
+                  'indicative': indicative}
 
-        #define the endpoint
-        endpoint = '/marketdata/quotes'
+        endpoint = '/quotes'
 
-        # grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
-        #return the response of the get request.
-        return requests.get(url = url, headers=merged_headers, params=data,
-                            verify = True, timeout = 10).json()
+    def get_quote(self, symbol_id, fields = None):
 
-    def get_quote(self, instruments = None):
 
-        '''
-        Serves as the mechanism to make a request to Get Quote.
+        params = {'fields': fields}
+        endpoint = f'/{symbol_id}/quotes'
 
-        Documentation Link: https://developer.tdameritrade.com/quotes/apis
-
-        NAME: instruments
-        DESC: A List of differen financial intruments.
-        TYPE: String
-
-        EXAMPLE:
-
-        Object.get_quotes(intruments = 'MSFT')
-        '''
-
-        #define the endpoint
-        endpoint = f'/marketdata/{instruments}/quotes'
-
-        # grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
-
-        #return the response of the get request.
-        return requests.get(url = url, headers=merged_headers, verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
 
-    #### PRICE HISTORY
+    #### Price History
 
-
-
-    def pricehistory_period(self, symbol = None, period_type = None, frequency_type = None,
-                           frequency = None, period = None, need_extendedhours_data = None):
+    def pricehistory_period(self, symbol, frequency_type, frequency, period_type, period,
+                            need_extendedhours_data = 'true', need_previousclose_price = 'true'):
 
         '''
         Get price history for a symbol defining Period. Its provide data up to the last closed day.
@@ -1101,57 +878,30 @@ class schwabApi():
         TYPE: String
         '''
 
-        #define the payload
-        data = {
-                'periodType':period_type,
-                'frequencyType':frequency_type,
-                'frequency':frequency,
-                'period':period,
-                'needExtendedHoursData':need_extendedhours_data
+        params = {
+                'symbol': symbol,
+                'frequencyType': frequency_type,
+                'frequency': frequency,
+                'periodType': period_type,
+                'period': period,
+                'needExtendedHoursData': need_extendedhours_data,
+                'needPreviousClose': need_previousclose_price
                 }
 
-        # define the endpoint
-        endpoint = f'marketdata/{symbol}/pricehistory'
+        endpoint = '/pricehistory'
 
-        #grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
-
-        #make the request
-        return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-    def pricehistory_dates(self, symbol = None, period_type = None, frequency_type = None,
-                          frequency = None, end_date = datetime.now(), start_date = datetime.now(),
-                          need_extendedhours_data = 'true'):
+    def pricehistory_dates(self, symbol, frequency_type, frequency,
+                          end_date = datetime.now(), start_date = datetime.now(),
+                          need_extendedhours_data = 'true', need_previousclose_price = 'true'):
 
         '''
         Get price history for symbol defining date Interval. It provides data till the last second.
 
         NAME: symbol
         DESC:
-        TYPE: String
-
-        NAME: periodType
-        DESC: The type of period to show. Valid values are day, month, year, or ytd. Default is day.
-        TYPE: String
-
-        NAME: frequencyType
-        DESC: The type of frequency with which a new candle is formed.
-              Valid frequencyTypes by periodType (defaults marked with an asterisk):
-                                                                    day: minute*
-                                                                    month: daily, weekly*
-                                                                    year: daily, weekly, monthly*
-                                                                    ytd: daily, weekly*
-        TYPE: String
-
-        NAME: frequency
-        DESC: The number of the frequencyType to be included in each candle.
-              Valid frequencies by frequencyType (defaults marked with an asterisk):
-                                                                    minute: 1*, 5, 10, 15, 30
-                                                                    daily: 1*
-                                                                    weekly: 1*
-                                                                    monthly: 1*
         TYPE: String
 
         NAME: endDate
@@ -1172,31 +922,26 @@ class schwabApi():
         end_date = int((end_date - epoch).total_seconds()*1000)
         start_date = int((start_date - epoch).total_seconds()*1000)
 
-        #define the payload
-        data = {
-                'periodType':period_type,
-                'frequencyType':frequency_type,
-                'frequency':frequency,
-                'endDate':end_date,
-                'startDate':start_date,
-                'needExtendedHoursData':need_extendedhours_data
+        params = {
+                'symbol': symbol,
+                'frequencyType': frequency_type,
+                'frequency': frequency,
+                'endDate': end_date,
+                'startDate': start_date,
+                'needExtendedHoursData': need_extendedhours_data,
+                'needPreviousClose': need_previousclose_price
                 }
 
         # define the endpoint
-        endpoint = f'marketdata/{symbol}/pricehistory'
+        endpoint = '/pricehistory'
 
-        #grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
-
-        #make the request
-        return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 10).json()
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-    #### OPTION CHAIN
+    #### Option Chain
 
 
-    def get_option_chain(self, option_chain = None):
+    def get_option_chain(self, option_chain):
 
         # symbol = None, contractType = None, StrikeCount = None, IncludeQuotes = None,
         # Strategy = None, interval = None, Strike = None, range = None, fromDate = None,
@@ -1240,14 +985,17 @@ class schwabApi():
         Object.get_option_chain( option_chain = option_chain_1)
         '''
         # take JSON representation of the string
-        data = option_chain
+        params = option_chain
 
         #define the endpoint
-        endpoint = '/marketdata/chains'
+        endpoint = '/chains'
 
-        #grab the original headers we have stored.
-        url, merged_headers = self._auth.headers(endpoint)
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
-        #return the response of the get request.
-        return requests.get(url = url, headers = merged_headers,params = data,
-                            verify = True, timeout = 10).json()
+    def get_option_expirationchain(self, symbol):
+
+        params = {'symbol': symbol}
+
+        endpoint = '/expirationchain'
+
+        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
