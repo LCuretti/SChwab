@@ -20,7 +20,7 @@ if not logging.root.handlers:
 
 logger = logging.getLogger(__name__)
 
-class SchwabAuthentication():
+class SchwabAuth():
 
     """
     Schwab API Authentication Class.
@@ -45,7 +45,7 @@ class SchwabAuthentication():
     REFRESH_DURATION = 7776000
 
 
-    def __init__(self, schwab_config: dict, store_refresh_token: bool  = True,
+    def __init__(self, config: dict, store_refresh_token: bool  = True,
                  single_access: bool = False):
 
         """
@@ -60,10 +60,10 @@ class SchwabAuthentication():
                                                token (default: False).
         """
 
-        if not schwab_config:
+        if not config:
             raise ValueError("schwab_config is required and cannot be empty.")
 
-        self._schwab_config = schwab_config
+        self._config = config
         self._store_refresh_token = store_refresh_token
         self._single_access = single_access
         self._tokens = {
@@ -93,7 +93,7 @@ class SchwabAuthentication():
         """
         Initializes authentication logic, handling refresh token persistence or renewal.
         """
-        refresh_token_file = f'./{self._schwab_config["user"]}refreshtoken.pickle'
+        refresh_token_file = f'./{self._config["user"]}refreshtoken.pickle'
         if os.path.isfile(refresh_token_file):
             if not self._store_refresh_token or self._single_access:
                 os.remove(refresh_token_file)
@@ -118,8 +118,8 @@ class SchwabAuthentication():
             str: Access code obtained through user authentication.
         """
 
-        api_key=self._schwab_config['client_id']
-        callback_url=self._schwab_config['redirect_uri']
+        api_key=self._config['client_id']
+        callback_url=self._config['redirect_uri']
 
         state = secrets.token_hex(16)[:30]
 
@@ -158,7 +158,7 @@ class SchwabAuthentication():
                                               timedelta(seconds=self.REFRESH_DURATION))
 
         if self._store_refresh_token:
-            refresh_token_file = f'./{self._schwab_config["user"]}refreshtoken.pickle'
+            refresh_token_file = f'./{self._config["user"]}refreshtoken.pickle'
             with open(refresh_token_file, 'wb') as file:
                 pickle.dump([self._tokens['refresh_token'],
                              self._tokens['refresh_expiration']], file)
@@ -179,7 +179,7 @@ class SchwabAuthentication():
 
         # define the payload
         extra_payload = {
-                'redirect_uri':self._schwab_config['redirect_uri'],
+                'redirect_uri':self._config['redirect_uri'],
                 'code': access_code
                   }
 
@@ -218,9 +218,9 @@ class SchwabAuthentication():
                 'Accept': 'application/json',
                 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
                 }
-        auth = (self._schwab_config['client_id'],self._schwab_config['app_secret'])
+        auth = (self._config['client_id'],self._config['app_secret'])
 
-        payload = {'client_id': self._schwab_config['client_id'],
+        payload = {'client_id': self._config['client_id'],
                    'grant_type': grant_type}
         payload.update(extra_payload)
 

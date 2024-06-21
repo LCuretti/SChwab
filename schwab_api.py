@@ -10,7 +10,7 @@ import json
 import urllib.parse as up
 import logging
 import requests
-from schwab_authentication import SchwabAuthentication
+from schwab_auth import SchwabAuth
 
 
 if not logging.root.handlers:
@@ -59,7 +59,7 @@ class SchwabApi():
     '''
 
 
-    def __init__(self, schwab_cfg):
+    def __init__(self, config):
 
         '''
         Initialize object with provided account info
@@ -69,7 +69,7 @@ class SchwabApi():
         It will be use in the headers method to send a valid token.
         '''
 
-        self.auth = SchwabAuthentication(schwab_cfg)
+        self.auth = SchwabAuth(config)
 
         #self._auth.authenticate()
         if self.auth:

@@ -27,6 +27,7 @@ THE SOFTWARE.
 @author: LC
 """
 from datetime import datetime
+from schwab_websocket import SchwabWebSocket
 
 class SchwabStreamerClient():
     '''
@@ -75,7 +76,7 @@ class SchwabStreamerClient():
 
     '''
 
-    def __init__(self, schwab_ws, subs_manager = None):
+    def __init__(self, api, subs_manager = None):
         '''
             Open API object in order to get credentials, url necessary for streaming login
 
@@ -84,9 +85,10 @@ class SchwabStreamerClient():
         '''
 
 
-        self.schwab_ws = schwab_ws
+        self.ws = SchwabWebSocket(api)
+
         if subs_manager is None:
-            self._subs_manage = schwab_ws.send_subscription_request
+            self._subs_manage = self.ws.send_subscription_request
         else:
             self._subs_manage = subs_manager
 
@@ -109,6 +111,19 @@ class SchwabStreamerClient():
         '''
         print(f'{subs_manager} bounded')
         self._subs_manage = subs_manager
+
+
+    def connect(self):
+        """
+        Connect to websocket
+        """
+        self.ws.connect()
+
+    def logout(self):
+        """
+        Disconnect the WebSocket
+        """
+        self.ws.send_logout_request()
 
 
     #### GET REQUEST ##########################
@@ -138,7 +153,7 @@ class SchwabStreamerClient():
                                      "keys": keys,
                                      }
                        }
-        self.schwab_ws.send_request(data_request)
+        self.ws.send_request(data_request)
 
     def data_request_news_story(self, keys):
 
@@ -170,7 +185,7 @@ class SchwabStreamerClient():
                                      }
                        }
 
-        self.schwab_ws.send_request(data_request)
+        self.ws.send_request(data_request)
 
     def data_request_chart_history_futures(self, symbol = '/ES',
                                            frequency = 'm5', period = 'd5',
@@ -245,7 +260,7 @@ class SchwabStreamerClient():
                                      "START_TIME": start_date,
                                     }
                     }
-        self.schwab_ws.send_request(data_request)
+        self.ws.send_request(data_request)
 
 
     #### SUBSCRIPTION REQUESTS ##################
@@ -282,7 +297,9 @@ class SchwabStreamerClient():
         SessionObject.data_request_account_activity(command = "SUBS", fields = '0,1')
 
         '''
-        subs_request = ["ACCT_ACTIVITY", "3", command, self.schwab_ws.streamer_info.get("schwabClientCorrelId"), fields, store_flag]
+        subs_request = ["ACCT_ACTIVITY", "3", command,
+                        self.ws.streamer_info.get("schwabClientCorrelId"),
+                        fields, store_flag]
 
         self._subs_manage(subs_request)
 
@@ -770,102 +787,102 @@ class SchwabStreamerClient():
 
     def subs_request_futures_book(self, command = "SUBS", keys = 'SPY, AAPL',
                                  fields = '0,1,2,3', store_flag = True):
-    
+
         '''
         NAME: command
         DESC: chose between "SUBS": subscribe or replace previous subscription.
                             "UNSUBS": unsubscribe
                             "ADD": subscribe or ADD to the previos subscription.
         TYPE: String
-    
+
         NAME: keys
         DESC: Symbols in upper case and separated by commas
         TYPE: String
-    
+
         MAME: fields
         DESC: select streaming fields.:
-    
+
         Field   Field Name          Type        Field Description
         key     Symbol            	String	    Ticker symbol in upper case.
         1       Level2 Time         int         Level2 time in milliseconds since epoch
         2       Bid Book            list        List of Bid prices and theirs volumes
         3       Ask Book            list        List of Ask prices and theirs volumes
         TYPE: String
-    
+
         EXAMPLES:
         SessionObject.data_request_listed_book(command = "SUBS", keys = 'SPY, AAPL',
                                                fields = '0,1,2,3')
         '''
-    
+
         subs_request = ["FUTURES_BOOK", "13", command, keys, fields, store_flag]
-    
+
         self._subs_manage(subs_request)
- 
+
     def subs_request_futures_options_book(self, command = "SUBS", keys = 'SPY, AAPL',
                                  fields = '0,1,2,3', store_flag = True):
-    
+
         '''
         NAME: command
         DESC: chose between "SUBS": subscribe or replace previous subscription.
                             "UNSUBS": unsubscribe
                             "ADD": subscribe or ADD to the previos subscription.
         TYPE: String
-    
+
         NAME: keys
         DESC: Symbols in upper case and separated by commas
         TYPE: String
-    
+
         MAME: fields
         DESC: select streaming fields.:
-    
+
         Field   Field Name          Type        Field Description
         key     Symbol            	String	    Ticker symbol in upper case.
         1       Level2 Time         int         Level2 time in milliseconds since epoch
         2       Bid Book            list        List of Bid prices and theirs volumes
         3       Ask Book            list        List of Ask prices and theirs volumes
         TYPE: String
-    
+
         EXAMPLES:
         SessionObject.data_request_listed_book(command = "SUBS", keys = 'SPY, AAPL',
                                                fields = '0,1,2,3')
         '''
-    
+
         subs_request = ["FUTURES_OPTIONS_BOOK", "13", command, keys, fields, store_flag]
-    
-        self._subs_manage(subs_request)       
- 
+
+        self._subs_manage(subs_request)
+
 
     def subs_request_forex_book(self, command = "SUBS", keys = 'SPY, AAPL',
                                  fields = '0,1,2,3', store_flag = True):
-    
+
         '''
         NAME: command
         DESC: chose between "SUBS": subscribe or replace previous subscription.
                             "UNSUBS": unsubscribe
                             "ADD": subscribe or ADD to the previos subscription.
         TYPE: String
-    
+
         NAME: keys
         DESC: Symbols in upper case and separated by commas
         TYPE: String
-    
+
         MAME: fields
         DESC: select streaming fields.:
-    
+
         Field   Field Name          Type        Field Description
         key     Symbol            	String	    Ticker symbol in upper case.
         1       Level2 Time         int         Level2 time in milliseconds since epoch
         2       Bid Book            list        List of Bid prices and theirs volumes
         3       Ask Book            list        List of Ask prices and theirs volumes
         TYPE: String
-    
+
         EXAMPLES:
         SessionObject.data_request_listed_book(command = "SUBS", keys = 'SPY, AAPL',
                                                fields = '0,1,2,3')
         '''
-    
+
         subs_request = ["FOREX_BOOK", "13", command, keys, fields, store_flag]
-    
+
         self._subs_manage(subs_request)
 
     def subs_request_listed_book(self, command = "SUBS", keys = 'SPY, AAPL',
@@ -973,21 +990,21 @@ class SchwabStreamerClient():
                                       fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,\
                                           17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,\
                                               33,34,35', store_flag = True):
-    
+
         '''
         NAME: command
         DESC: chose between "SUBS": subscribe or replace previous subscription.
                             "UNSUBS": unsubscribe
                             "ADD": subscribe or ADD to the previos subscription.
         TYPE: String
-    
+
         NAME: keys
         DESC: Futures symbol as a product or active symbol (ie. /ES or /ESM4)
         TYPE: String
-    
+
         MAME: fields
         DESC: select streaming fields.:
-    
+
         Fields	  Field Name	              Type	    Field Description
         key	      Symbol	                  String	Ticker symbol in upper case.
         1	      Bid Price	                  double	Current Best Bid Price
@@ -1035,14 +1052,14 @@ class SchwabStreamerClient():
         34	      Future Active Symbol	      String	Symbol of the active contract
         35	      Future Expiration Date	  long	    Expiration date of this contract
         TYPE: String
-    
+
         EXAMPLES:
         SessionObject.data_request_chart_levelone_futures(command = "SUBS", keys = '/ES',
                                                           fields = '0,1,2,3,4,5,6')
         '''
-    
+
         subs_request = ["LEVELONE_EQUITIES", "16", command, keys, fields, store_flag]
-    
+
         self._subs_manage(subs_request)
 
     def subs_request_levelone_futures(self, command = "SUBS", keys = '/ES',
@@ -1191,29 +1208,29 @@ class SchwabStreamerClient():
 
 
     ### Ver si no es options
-    def subs_request_levelone_options(self, keys, command = "SUBS", 
+    def subs_request_levelone_options(self, keys, command = "SUBS",
                                     fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,\
                                         19,20,21,22,23,24,25,26,27,28', store_flag = True):
-    
+
         '''
         Level one option quote and trade
-    
+
         NAME: command
         DESC: chose between "SUBS": subscribe or replace previous subscription.
                             "UNSUBS": unsubscribe
                             "ADD": subscribe or ADD to the previos subscription.
         TYPE: String
-    
+
         NAME: keys
         DESC: Symbols in upper case and separated by commas (FOREX symbols (ie.. EUR/USD,
                                                                             GBP/USD, EUR/JPY,
                                                                             USD/JPY, GBP/JPY,
                                                                             AUD/USD))
         TYPE: String
-    
+
         MAME: fields
         DESC: select streaming fields.:
-    
+
         Field   Field Name          Type        Field Description
         key   	Symbol	            String	Ticker symbol in upper case.
         1   	Bid Price	        double	Current Best Bid Price
@@ -1247,41 +1264,41 @@ class SchwabStreamerClient():
         27  	52 Week Low        	double	Lowest price traded in the past 12 months, or 52 weeks
         28  	Mark               	double	Mark-to-Market value is calculated daily using current
                                             prices to determine profit/loss
-    
+
         TYPE: String
-    
+
         EXAMPLES:
         SessionObject.data_request_levelone_forex(command = "SUBS", keys = 'EUR/USD',
                                                   fields = '0,1,2,3,4,5,6,7,8,9,10')
         '''
-    
+
         subs_request = ["LEVELONE_OPTIONS", "17", command, keys, fields, store_flag]
-    
+
         self._subs_manage(subs_request)
 
-    def subs_request_levelone_future_options(self, keys, command = "SUBS", 
+    def subs_request_levelone_future_options(self, keys, command = "SUBS",
                                     fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,\
                                         19,20,21,22,23,24,25,26,27,28', store_flag = True):
-    
+
         '''
         Level one option quote and trade
-    
+
         NAME: command
         DESC: chose between "SUBS": subscribe or replace previous subscription.
                             "UNSUBS": unsubscribe
                             "ADD": subscribe or ADD to the previos subscription.
         TYPE: String
-    
+
         NAME: keys
         DESC: Symbols in upper case and separated by commas (FOREX symbols (ie.. EUR/USD,
                                                                             GBP/USD, EUR/JPY,
                                                                             USD/JPY, GBP/JPY,
                                                                             AUD/USD))
         TYPE: String
-    
+
         MAME: fields
         DESC: select streaming fields.:
-    
+
         Field   Field Name          Type        Field Description
         key   	Symbol	            String	Ticker symbol in upper case.
         1   	Bid Price	        double	Current Best Bid Price
@@ -1315,16 +1332,16 @@ class SchwabStreamerClient():
         27  	52 Week Low        	double	Lowest price traded in the past 12 months, or 52 weeks
         28  	Mark               	double	Mark-to-Market value is calculated daily using current
                                             prices to determine profit/loss
-    
+
         TYPE: String
-    
+
         EXAMPLES:
         SessionObject.data_request_levelone_forex(command = "SUBS", keys = 'EUR/USD',
                                                   fields = '0,1,2,3,4,5,6,7,8,9,10')
         '''
-    
+
         subs_request = ["LEVELONE_FUTURES_OPTIONS", "17", command, keys, fields, store_flag]
-    
+
         self._subs_manage(subs_request)
 
     def subs_request_timesale_equity(self, command = "SUBS", keys = 'SPY, AAPL',

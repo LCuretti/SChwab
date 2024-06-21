@@ -36,7 +36,7 @@ def is_connected():
     except OSError:
         return False
 
-class SchwabStreamerWebSocket():
+class SchwabWebSocket():
     '''
     Handles Schwab websocket connection.
     input parameter:
@@ -45,9 +45,9 @@ class SchwabStreamerWebSocket():
     '''
 
 
-    def __init__(self, schwab_api, keep_alive_manager = None, data_manager = None):
+    def __init__(self, api, keep_alive_manager = None, data_manager = None):
 
-        self.schwab_api = schwab_api
+        self.api = api
         self._keep_alive_manager = keep_alive_manager or self._resubscribe_all
         self._data_manager = data_manager or self._store_data
 
@@ -145,12 +145,12 @@ class SchwabStreamerWebSocket():
             self._open_connection()
 
             # Create a new thread
-            schwab_websocket_thread = Thread(
-                                         name='schwab_websocket_thread',
-                                         target = self.schwab_websocket.run_forever,
-                                         args = (None, None, 30,5),
-                                         daemon=True)
-            schwab_websocket_thread.start()
+            websocket_thread = Thread(
+                                    name='websocket_thread',
+                                    target = self.websocket.run_forever,
+                                    args = (None, None, 30,5),
+                                    daemon=True)
+            websocket_thread.start()
 
             waiting = 0
             while (not self.is_logged_in and not self._error
@@ -159,7 +159,7 @@ class SchwabStreamerWebSocket():
                 waiting += 1
                 time.sleep(2)
                 if waiting > 10:
-                    self.schwab_websocket.close()
+                    self.websocket.close()
                     #break
 
             if self.is_logged_in:
@@ -174,14 +174,14 @@ class SchwabStreamerWebSocket():
 
     def _open_connection(self):
 
-        response = self.schwab_api.get_user_preference()
+        response = self.api.get_user_preference()
         self.streamer_info = response['streamerInfo'][0]
 
         # Turn off seeing the send message.
         websocket.enableTrace(False)
 
         # Initalize a new websocket object.
-        self.schwab_websocket = websocket.WebSocketApp(
+        self.websocket = websocket.WebSocketApp(
                               self.streamer_info.get('streamerSocketUrl'),
                               on_message = self._ws_on_message,
                               on_error = self._ws_on_error,
@@ -189,13 +189,13 @@ class SchwabStreamerWebSocket():
                               on_pong = self._ws_on_pong)
 
         # Define what to do on the open, in this case send our login request.
-        self.schwab_websocket.on_open = self._ws_on_open
+        self.websocket.on_open = self._ws_on_open
 
 
     def _ws_on_pong(self, _ws, _msg):
 
-        self.ping_time = datetime.fromtimestamp(self.schwab_websocket.last_ping_tm)
-        pong_time = datetime.fromtimestamp(self.schwab_websocket.last_pong_tm)
+        self.ping_time = datetime.fromtimestamp(self.websocket.last_ping_tm)
+        pong_time = datetime.fromtimestamp(self.websocket.last_pong_tm)
         self.ping = (pong_time - self.ping_time).microseconds / 1000
 
 
@@ -290,15 +290,17 @@ class SchwabStreamerWebSocket():
 
             time_diff = now - response_time
 
-            self.timeoffset = (time_diff.microseconds + 90000) if time_diff.days < 0 else (90000 - time_diff.microseconds)
+            self.timeoffset = ((time_diff.microseconds + 90000) if time_diff.days < 0
+                              else (90000 - time_diff.microseconds))
 
             if abs(self.timeoffset) > 1000000:
-                logger.warning("Your system clock is off by more than 1 second. Please synchronize it")
+                logger.warning("Your system clock is off by more than 1 sec. Please synchronize it")
             logger.info('System clock offset: %d microseconds', self.timeoffset)
             logger.info('Logged in')
 
         else:
-            logger.info("%s %s", content['response'][0]['content']['msg'], content['response'][0]['service'])
+            logger.info("%s %s", content['response'][0]['content']['msg'],
+                        content['response'][0]['service'])
             #logger.info('%-50s %s', response, response_time)
 
             service = content['response'][0]['service']
@@ -358,7 +360,7 @@ class SchwabStreamerWebSocket():
         to the Streamer Server must be a LOGIN command.
         '''
         parameters = {
-            "Authorization": self.schwab_api.auth.access_token,
+            "Authorization": self.api.auth.access_token,
             "SchwabClientChannel": self.streamer_info.get("schwabClientChannel"),
             "SchwabClientFunctionId": self.streamer_info.get("schwabClientFunctionId")
         }
@@ -376,7 +378,7 @@ class SchwabStreamerWebSocket():
         # For example if the uri is wrong you will not be able to log in then
         # connectipon started is False.
 
-        self.schwab_websocket.send(json.dumps(login_request))
+        self.websocket.send(json.dumps(login_request))
 
 
     def send_logout_request(self):
@@ -392,15 +394,17 @@ class SchwabStreamerWebSocket():
             self.is_logged_in = False
             self.current_subscriptions = []
 
-            logout_request = {"service": "ADMIN",
-                              "requestid": "1",
-                              "command": "LOGOUT",
-                              "SchwabClientCustomerId": self.streamer_info.get("schwabClientCustomerId"),
-                              "SchwabClientCorrelId": self.streamer_info.get("schwabClientCorrelId")}
+            logout_request = {
+                "service": "ADMIN",
+                "requestid": "1",
+                "command": "LOGOUT",
+                "SchwabClientCustomerId": self.streamer_info.get("schwabClientCustomerId"),
+                "SchwabClientCorrelId": self.streamer_info.get("schwabClientCorrelId")
+                }
 
-            self.schwab_websocket.send(json.dumps(logout_request))
+            self.websocket.send(json.dumps(logout_request))
             logger.info('Client is logged out.')
-            self.schwab_websocket.close()
+            self.websocket.close()
 
         else:
             logger.warning('Client is already logged out.')
@@ -443,7 +447,7 @@ class SchwabStreamerWebSocket():
 
 
         if self.is_logged_in:
-            self.schwab_websocket.send(json.dumps(request))
+            self.websocket.send(json.dumps(request))
 
         else:
             logger.warning('''No websocket conection opened.
