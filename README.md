@@ -1,8 +1,8 @@
 # SChwab
 
 - Auth--------------->Done
-- API---------------->Ongoing
-- Streamer----------->TODO
+- API---------------->Done (missing ASYNC)
+- Streamer----------->Done
 - Desktop App-------->TODO
 - Trading bot-------->TODO
 - AI trading Bot----->TODO
