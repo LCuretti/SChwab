@@ -31,24 +31,21 @@ Handles Authentication, WebSocket streaming subscriptions and API requests.
     Provides one method for each kind of subscription with the proper documentation
     and default values set.
 
-
 ### Balances:
     Downloads the complete transactions history and provides P/L
     for each Day/Week/Month/Year with FIFO and LIFO approaches.
 
-
 ### Test:
     Examples on each API endpoint and working streamer subscriptions
 
-
-#### Next Steps:
+### Next Steps:
 
 - Desktop App
 - Trading Bot
 - AI trading Bot
 - AI portfolio
 
-### Project Dependencies
+### Project Dependencies:
 ```mermaid
 graph TD;
     Service-->API;
