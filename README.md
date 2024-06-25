@@ -3,7 +3,8 @@ Handles Authentication, WebSocket streaming subscriptions and API requests.
 (Developed on Anaconda Spyder on Apple platform)
 
 ### Auth:
-    Handles the authentication process and keeps a valid access token to be used by Schwab (endpoint requests).
+    Handles the authentication process and keeps a valid access token to be used
+    by Schwab (endpoint requests).
     To authenticate, you need to provide:
         "user": -- Used to generate the refresh token file
         "redirect_uri": "https://127.0.0.1",
@@ -27,11 +28,13 @@ Handles Authentication, WebSocket streaming subscriptions and API requests.
      - Implement ASYNC.
 
 ### Streamer:
-    Provides one method for each kind of subscription with the proper documentation and default values set.
+    Provides one method for each kind of subscription with the proper documentation
+    and default values set.
 
 
 ### Balances:
-    Downloads the complete transactions history and provides P/L for each Day/Week/Month/Year with FIFO and LIFO approaches.
+    Downloads the complete transactions history and provides P/L
+    for each Day/Week/Month/Year with FIFO and LIFO approaches.
 
 
 ### Test:
