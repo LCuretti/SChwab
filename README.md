@@ -47,3 +47,12 @@ Handles Authentication, WebSocket streaming subscriptions and API requests.
 - Trading Bot
 - AI trading Bot
 - AI portfolio
+
+### Project Dependencies
+```mermaid
+graph TD;
+    Service-->API;
+    Service-->Streamer;
+    API-->Auth;
+    Streamer-->WebSocket;
+    WebSocket-->API;
