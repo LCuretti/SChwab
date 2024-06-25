@@ -1156,7 +1156,7 @@ if __name__ == '__main__':
     JSON_FILE = './AllTransactions.json'
     EXCEL_FILE_PATH = './AllTransactions_new.xlsx'
     LOG_FILE = './transactions.log'
-    CONFIG_FILE = './config.json'
+    CONFIG_FILE = './Schwab_config.json'
 
     # Configura la configuración del logging
     logging.basicConfig()
@@ -1167,31 +1167,33 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     logger.info('Program started.')
 
-    from schwab_api import schwabApi
+    from schwab_api import SchwabApi
     user_data = read_json_file(CONFIG_FILE)
 
-    schwab_api = schwabApi(user_data)
-
-    account = schwab_api.get_accounts(fields = ['positions'])
-    print(account)
-    # Uso del sistema
-    balances_system = Balances()
-    allTransactions = load_all_transactions(schwab_api, JSON_FILE)
-    #allTransactions = read_json_file(JSON_FILE)
-
-    for t in allTransactions:
-        balances_system.transaction_interpretation_schwab(t)
-        balances_system.process_transaction(t)
-
-    balances_states_df = create_dataframe(balances_system.processed_transactions)
-    balances_states_df = cumulative_results(balances_states_df)
-
-    #balances_states_df = calculate_cumulative_count_result(balances_states_df)
-    convert_to_excel(balances_states_df, EXCEL_FILE_PATH)
-
-    verification()
-
-
+    try:
+        schwab_api = SchwabApi(user_data)
+    
+        account = schwab_api.get_accounts(fields = ['positions'])
+        print(account)
+        # Uso del sistema
+        balances_system = Balances()
+        allTransactions = load_all_transactions(schwab_api, JSON_FILE)
+        #allTransactions = read_json_file(JSON_FILE)
+    
+        for t in allTransactions:
+            balances_system.transaction_interpretation_schwab(t)
+            balances_system.process_transaction(t)
+    
+        balances_states_df = create_dataframe(balances_system.processed_transactions)
+        balances_states_df = cumulative_results(balances_states_df)
+    
+        #balances_states_df = calculate_cumulative_count_result(balances_states_df)
+        convert_to_excel(balances_states_df, EXCEL_FILE_PATH)
+    
+        verification()
+    except (FileNotFoundError, ValueError, Exception) as e:
+        print(e)
+    
     logger.info('Program finished.')
     logging.shutdown()
 

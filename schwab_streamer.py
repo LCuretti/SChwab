@@ -27,7 +27,16 @@ THE SOFTWARE.
 @author: LC
 """
 from datetime import datetime
+import logging
 from schwab_websocket import SchwabWebSocket
+
+if not logging.root.handlers:
+
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.info("Logging activated at Stremer")
+logger = logging.getLogger(__name__)
+
 
 class SchwabStreamerClient():
     '''
@@ -85,12 +94,12 @@ class SchwabStreamerClient():
         '''
 
 
-        self.ws = SchwabWebSocket(api)
+        self._ws = SchwabWebSocket(api)
 
         if subs_manager is None:
-            self._subs_manage = self.ws.send_subscription_request
+            self.subs_manager = self._ws.send_subscription_request
         else:
-            self._subs_manage = subs_manager
+            self.subs_manager = subs_manager
 
 # =============================================================================
 #     def __repr__(self):
@@ -109,21 +118,21 @@ class SchwabStreamerClient():
         :type callback: function or method
 
         '''
-        print(f'{subs_manager} bounded')
-        self._subs_manage = subs_manager
+        logger.info('%s bounded', subs_manager.__name__)
+        self.subs_manager = subs_manager
 
 
     def connect(self):
         """
         Connect to websocket
         """
-        self.ws.connect()
+        self._ws.connect()
 
     def logout(self):
         """
         Disconnect the WebSocket
         """
-        self.ws.send_logout_request()
+        self._ws.send_logout_request()
 
 
     #### GET REQUEST ##########################
@@ -147,13 +156,13 @@ class SchwabStreamerClient():
 
         data_request= {
                        "service": "NEWS_HEADLINELIST",
-                       "requestid": "22",
+                       "requestid": "29",
                        "command": 'GET',
                        "parameters": {
                                      "keys": keys,
                                      }
                        }
-        self.ws.send_request(data_request)
+        self._ws.send_request(data_request)
 
     def data_request_news_story(self, keys):
 
@@ -178,14 +187,14 @@ class SchwabStreamerClient():
 
         data_request= {
                        "service": "NEWS_STORY",
-                       "requestid": "23",
+                       "requestid": "30",
                        "command": 'GET',
                        "parameters": {
                                      "keys": keys,
                                      }
                        }
 
-        self.ws.send_request(data_request)
+        self._ws.send_request(data_request)
 
     def data_request_chart_history_futures(self, symbol = '/ES',
                                            frequency = 'm5', period = 'd5',
@@ -250,7 +259,7 @@ class SchwabStreamerClient():
 
         data_request= {
                       "service": "CHART_HISTORY_FUTURES",
-                      "requestid": "24",
+                      "requestid": "31",
                       "command": 'GET',
                       "parameters": {
                                      "symbol": symbol,
@@ -260,7 +269,7 @@ class SchwabStreamerClient():
                                      "START_TIME": start_date,
                                     }
                     }
-        self.ws.send_request(data_request)
+        self._ws.send_request(data_request)
 
 
     #### SUBSCRIPTION REQUESTS ##################
@@ -298,10 +307,10 @@ class SchwabStreamerClient():
 
         '''
         subs_request = ["ACCT_ACTIVITY", "3", command,
-                        self.ws.streamer_info.get("schwabClientCorrelId"),
+                        self._ws.streamer_info.get("schwabClientCorrelId"),
                         fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_actives_nasdaq(self, command = "SUBS", keys = 'NASDAQ-60',
                                     fields = '0,1', store_flag = True):
@@ -342,7 +351,7 @@ class SchwabStreamerClient():
 
         subs_request = ["ACTIVES_NASDAQ", "4", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
 
     def subs_request_actives_nyse(self, command = "SUBS", keys = 'NYSE-60',
@@ -385,7 +394,7 @@ class SchwabStreamerClient():
 
         subs_request = ["ACTIVES_NYSE", "5", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
 
     def subs_request_actives_otcbb(self, command = "SUBS", keys = 'OTCBB-60',
@@ -428,7 +437,7 @@ class SchwabStreamerClient():
 
         subs_request = ["ACTIVES_OTCBB", "6", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
 
     def subs_request_actives_options(self, command = "SUBS", keys = 'OPTS-DESC-60',
@@ -476,7 +485,7 @@ class SchwabStreamerClient():
 
         subs_request = ["ACTIVES_OPTIONS", "7", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
 
     def subs_request_chart_equity(self, command = "SUBS", keys = 'SPY, AAPL',
@@ -521,7 +530,7 @@ class SchwabStreamerClient():
 
         subs_request = ["CHART_EQUITY", "8", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
 
     def subs_request_chart_futures(self, command = "SUBS", keys = '/ES',
@@ -563,7 +572,7 @@ class SchwabStreamerClient():
 
         subs_request = ["CHART_FUTURES", "9", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_chart_options(self, keys, command = "SUBS",
                                    fields = '0,1,2,3,4,5,6', store_flag = True):
@@ -605,7 +614,7 @@ class SchwabStreamerClient():
 
         subs_request = ["CHART_OPTIONS", "10", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_quote(self, command = "SUBS", keys = 'SPY, AAPL',
                            fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,22,23,24,\
@@ -708,7 +717,7 @@ class SchwabStreamerClient():
 
         subs_request = ["QUOTE", "11", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_option(self, keys, command = "SUBS",
                             fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,\
@@ -783,7 +792,7 @@ class SchwabStreamerClient():
 
         subs_request = ["OPTION", "12", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_futures_book(self, command = "SUBS", keys = 'SPY, AAPL',
                                  fields = '0,1,2,3', store_flag = True):
@@ -816,7 +825,7 @@ class SchwabStreamerClient():
 
         subs_request = ["FUTURES_BOOK", "13", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_futures_options_book(self, command = "SUBS", keys = 'SPY, AAPL',
                                  fields = '0,1,2,3', store_flag = True):
@@ -847,9 +856,9 @@ class SchwabStreamerClient():
                                                fields = '0,1,2,3')
         '''
 
-        subs_request = ["FUTURES_OPTIONS_BOOK", "13", command, keys, fields, store_flag]
+        subs_request = ["FUTURES_OPTIONS_BOOK", "14", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
 
     def subs_request_forex_book(self, command = "SUBS", keys = 'SPY, AAPL',
@@ -881,9 +890,9 @@ class SchwabStreamerClient():
                                                fields = '0,1,2,3')
         '''
 
-        subs_request = ["FOREX_BOOK", "13", command, keys, fields, store_flag]
+        subs_request = ["FOREX_BOOK", "15", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_listed_book(self, command = "SUBS", keys = 'SPY, AAPL',
                                  fields = '0,1,2,3', store_flag = True):
@@ -914,9 +923,9 @@ class SchwabStreamerClient():
                                                fields = '0,1,2,3')
         '''
 
-        subs_request = ["LISTED_BOOK", "13", command, keys, fields, store_flag]
+        subs_request = ["LISTED_BOOK", "16", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_nasdaq_book(self, command = "SUBS", keys = 'SPY, AAPL',
                                  fields = '0,1,2,3', store_flag = True):
@@ -947,9 +956,9 @@ class SchwabStreamerClient():
                                                fields = '0,1,2,3')
         '''
 
-        subs_request = ["NASDAQ_BOOK", "14", command, keys, fields, store_flag]
+        subs_request = ["NASDAQ_BOOK", "17", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_options_book(self, keys, command = "SUBS",
                                   fields = '0,1,2,3', store_flag = True):
@@ -981,9 +990,9 @@ class SchwabStreamerClient():
         '''
 
 
-        subs_request = ["OPTIONS_BOOK", "15", command, keys, fields, store_flag]
+        subs_request = ["OPTIONS_BOOK", "18", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     ### ver si no es quotes
     def subs_request_levelone_equity(self, command = "SUBS", keys = 'AAPL',
@@ -1058,9 +1067,9 @@ class SchwabStreamerClient():
                                                           fields = '0,1,2,3,4,5,6')
         '''
 
-        subs_request = ["LEVELONE_EQUITIES", "16", command, keys, fields, store_flag]
+        subs_request = ["LEVELONE_EQUITIES", "19", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_levelone_futures(self, command = "SUBS", keys = '/ES',
                                       fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,\
@@ -1134,9 +1143,9 @@ class SchwabStreamerClient():
                                                           fields = '0,1,2,3,4,5,6')
         '''
 
-        subs_request = ["LEVELONE_FUTURES", "16", command, keys, fields, store_flag]
+        subs_request = ["LEVELONE_FUTURES", "20", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_levelone_forex(self, command = "SUBS", keys = 'EUR/USD',
                                     fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,\
@@ -1202,9 +1211,9 @@ class SchwabStreamerClient():
                                                   fields = '0,1,2,3,4,5,6,7,8,9,10')
         '''
 
-        subs_request = ["LEVELONE_FOREX", "17", command, keys, fields, store_flag]
+        subs_request = ["LEVELONE_FOREX", "21", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
 
     ### Ver si no es options
@@ -1272,9 +1281,9 @@ class SchwabStreamerClient():
                                                   fields = '0,1,2,3,4,5,6,7,8,9,10')
         '''
 
-        subs_request = ["LEVELONE_OPTIONS", "17", command, keys, fields, store_flag]
+        subs_request = ["LEVELONE_OPTIONS", "22", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_levelone_future_options(self, keys, command = "SUBS",
                                     fields = '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,\
@@ -1340,9 +1349,9 @@ class SchwabStreamerClient():
                                                   fields = '0,1,2,3,4,5,6,7,8,9,10')
         '''
 
-        subs_request = ["LEVELONE_FUTURES_OPTIONS", "17", command, keys, fields, store_flag]
+        subs_request = ["LEVELONE_FUTURES_OPTIONS", "23", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_timesale_equity(self, command = "SUBS", keys = 'SPY, AAPL',
                                      fields = '0,1,2,3,4', store_flag = True):
@@ -1375,9 +1384,9 @@ class SchwabStreamerClient():
                                                    fields = '0,1,2,3,4,5,6')
         '''
 
-        subs_request = ["TIMESALE_EQUITY", "18", command, keys, fields, store_flag]
+        subs_request = ["TIMESALE_EQUITY", "24", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_timesale_futures(self, command = "SUBS", keys = '/ES',
                                       fields = '0,1,2,3,4', store_flag = True):
@@ -1410,9 +1419,9 @@ class SchwabStreamerClient():
                                                     fields = '0,1,2,3,4,5,6')
         '''
 
-        subs_request = ["TIMESALE_FUTURES", "19", command, keys, fields, store_flag]
+        subs_request = ["TIMESALE_FUTURES", "25", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_timesale_options(self, keys, command = "SUBS",
                                       fields = '0,1,2,3,4', store_flag = True):
@@ -1444,9 +1453,9 @@ class SchwabStreamerClient():
                                                     fields = '0,1,2,3,4,5,6')
         '''
 
-        subs_request = ["TIMESALE_OPTIONS", "20", command, keys, fields, store_flag]
+        subs_request = ["TIMESALE_OPTIONS", "26", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_timesale_forex(self, keys, command = "SUBS",
                                       fields = '0,1,2,3,4', store_flag = True):
@@ -1478,9 +1487,9 @@ class SchwabStreamerClient():
                                                     fields = '0,1,2,3,4,5,6')
         '''
 
-        subs_request = ["TIMESALE_FOREX", "20", command, keys, fields, store_flag]
+        subs_request = ["TIMESALE_FOREX", "27", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)
 
     def subs_request_news_headline(self, command = "SUBS", keys = 'SPY, AAPL',
                                    fields = '0,1,2,3,4,5,6,7,8,9,10', store_flag = True):
@@ -1519,6 +1528,6 @@ class SchwabStreamerClient():
                                                  fields = '0,1,2,3,4,5,6,7,8,9,10')
         '''
 
-        subs_request = ["NEWS_HEADLINE", "21", command, keys, fields, store_flag]
+        subs_request = ["NEWS_HEADLINE", "28", command, keys, fields, store_flag]
 
-        self._subs_manage(subs_request)
+        self.subs_manager(subs_request)

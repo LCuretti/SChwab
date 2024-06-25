@@ -15,14 +15,14 @@ import websocket #websocket-client
 
 
 if not logging.root.handlers:
-    print("No loggin handler at Websocket")
+
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
-
+    logging.info("Logging activated at Websocket")
 logger = logging.getLogger(__name__)
 
 
-def is_connected():
+def is_connected() -> bool:
     '''
     :return: True if there is internet connection
     :rtype: boolean
@@ -36,7 +36,7 @@ def is_connected():
     except OSError:
         return False
 
-class SchwabWebSocket():
+class SchwabWebSocket:
     '''
     Handles Schwab websocket connection.
     input parameter:
@@ -45,7 +45,8 @@ class SchwabWebSocket():
     '''
 
 
-    def __init__(self, api, keep_alive_manager = None, data_manager = None):
+    def __init__(self, api: object, keep_alive_manager: callable = None,
+                 data_manager: callable = None):
 
         self.api = api
         self._keep_alive_manager = keep_alive_manager or self._resubscribe_all
@@ -76,7 +77,7 @@ class SchwabWebSocket():
         self.streamer_info = None
 
 
-    def bind_to_keep_alive_manager(self, keep_alive_manager):
+    def bind_to_keep_alive_manager(self, keep_alive_manager: callable) -> None:
         """
         Binds an external function as the keep-alive callback.
 
@@ -87,7 +88,7 @@ class SchwabWebSocket():
         self._keep_alive_manager = keep_alive_manager
 
 
-    def bind_to_data_manager(self, data_manager):
+    def bind_to_data_manager(self, data_manager: callable) -> None:
         """
         Binds an external function as the data handler.
 
@@ -100,7 +101,7 @@ class SchwabWebSocket():
 
 
 
-    def _reconnect(self):
+    def _reconnect(self) -> None:
         """
         Attempts to reconnect after a websocket connection drop.
 
@@ -120,7 +121,7 @@ class SchwabWebSocket():
             self._keep_alive_manager()
 
 
-    def _resubscribe_all(self):
+    def _resubscribe_all(self) -> None:
         '''
         Subscribe all subscriptions as before the interruption
         It will follow the same sequence of subscriptions and unsubcriptions
@@ -132,7 +133,7 @@ class SchwabWebSocket():
 
 
 
-    def connect(self):
+    def connect(self) -> None:
         '''
         Start websocket connection
         '''
@@ -172,7 +173,7 @@ class SchwabWebSocket():
             logger.warning("Streamer already started")
 
 
-    def _open_connection(self):
+    def _open_connection(self) -> None:
 
         response = self.api.get_user_preference()
         self.streamer_info = response['streamerInfo'][0]
@@ -192,34 +193,29 @@ class SchwabWebSocket():
         self.websocket.on_open = self._ws_on_open
 
 
-    def _ws_on_pong(self, _ws, _msg):
+    def _ws_on_pong(self, _ws: websocket.WebSocketApp, _msg: str) -> None:
 
         self.ping_time = datetime.fromtimestamp(self.websocket.last_ping_tm)
         pong_time = datetime.fromtimestamp(self.websocket.last_pong_tm)
         self.ping = (pong_time - self.ping_time).microseconds / 1000
 
 
-    def _ws_on_open(self, _ws):
+    def _ws_on_open(self, _ws: websocket.WebSocketApp) -> None:
         '''
         When connection is open send the logging request
         '''
         self._send_login_request()
 
 
-    def _ws_on_error(self, _ws, error):
+    def _ws_on_error(self, _ws: websocket.WebSocketApp, error: Exception) -> None:
 
         self._error = True
         error_str = str(error)
-
-        print('-' * 40)
         logger.error(error_str)
-# =============================================================================
-#         if error_str == 'ping/pong timed out':
-#             self._reconnect()
-# =============================================================================
 
 
-    def _ws_on_close(self, _ws, close_status_code = None, close_msg = None):
+    def _ws_on_close(self, _ws: websocket.WebSocketApp,
+                     close_status_code: int = None, close_msg: str = None) -> None:
 
         logger.info(close_status_code)
         logger.info(close_msg)
@@ -227,7 +223,6 @@ class SchwabWebSocket():
         # No longer Logged In
         self.is_logged_in = False
         self._on_close = True
-        print('-' * 40)
         logger.info('Websocket is Closed.')
 
         # objgraph.show_refs([self], filename='sample-graph.png')
@@ -236,7 +231,7 @@ class SchwabWebSocket():
             self._reconnect()
 
 
-    def _ws_on_message(self, _ws, message):
+    def _ws_on_message(self, _ws: websocket.WebSocketApp, message: str) -> None:
         '''
         Handle the messages it receives
         '''
@@ -265,7 +260,7 @@ class SchwabWebSocket():
             self._handle_data_message(message)
 
 
-    def _handle_notify_message(self, content):
+    def _handle_notify_message(self, content: dict) -> None:
 
         self.response_types['notify'].append(content)
 
@@ -275,7 +270,7 @@ class SchwabWebSocket():
         else:
             logger.info(content)
 
-    def _handle_response_message(self, content):
+    def _handle_response_message(self, content: dict) -> None:
         '''
         The first response is the login answer, if it ok set the LoggedIn to True
         '''
@@ -331,22 +326,22 @@ class SchwabWebSocket():
         self.response_types['response'].append(content)
 
 
-    def _handle_snapshot_message(self, content):
+    def _handle_snapshot_message(self, content:dict) -> None:
         '''
         snapshot from Get services
         '''
         self.response_types['snapshot'].append(content)
 
 
-    def _handle_data_message(self, content):
+    def _handle_data_message(self, content: dict) -> None:
         self._delay_test(content['data'][-1]['timestamp'])
         self._data_manager(content)
 
-    def _store_data(self, content):
+    def _store_data(self, content: dict) -> None:
         self.response_types['data'].append(content)
 
 
-    def _delay_test(self,timestamp):
+    def _delay_test(self, timestamp: int) -> None:
 
         now = datetime.now()
         datatime = datetime.fromtimestamp(timestamp/1000)
@@ -354,13 +349,13 @@ class SchwabWebSocket():
         # self.stream_delay = (now - datatime).microseconds / 1000
 
 
-    def _send_login_request(self):
+    def _send_login_request(self) -> None:
         '''
         When WebSocket connection is opened, the first command
         to the Streamer Server must be a LOGIN command.
         '''
         parameters = {
-            "Authorization": self.api.auth.access_token,
+            "Authorization": self.api.access_token,
             "SchwabClientChannel": self.streamer_info.get("schwabClientChannel"),
             "SchwabClientFunctionId": self.streamer_info.get("schwabClientFunctionId")
         }
@@ -381,7 +376,7 @@ class SchwabWebSocket():
         self.websocket.send(json.dumps(login_request))
 
 
-    def send_logout_request(self):
+    def send_logout_request(self) -> None:
         '''
         Logout closes the WebSocket Session and cleans up
         all subscriptions for the client session.
@@ -411,7 +406,7 @@ class SchwabWebSocket():
 
 
 
-    def send_qos_request(self, qoslevel = '0'):
+    def send_qos_request(self, qoslevel: str = '0') -> None:
         '''
         Quality of Service provides the different rates of data updates per protocol
         (binary, websocket etc), or per user based.
@@ -432,7 +427,7 @@ class SchwabWebSocket():
         self.send_request(qos_request)
 
 
-    def send_request(self, request):
+    def send_request(self, request: dict) -> None:
         '''
         Method for request handler. This method is the one that make requests to WebSocket
         :param data_request: DESCRIPTION
@@ -454,7 +449,7 @@ class SchwabWebSocket():
                   Please run connect method in order to be logged in.''')
 
 
-    def send_subscription_request(self, subscription):
+    def send_subscription_request(self, subscription: tuple) -> None:
         '''
         Method for subscription handler
         '''

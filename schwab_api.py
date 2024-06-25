@@ -7,58 +7,33 @@ Created on Thu Nov  7 08:23:24 2019
 
 from datetime import datetime
 import json
+from typing import Optional, Dict, Any, Callable
 import urllib.parse as up
 import logging
 import requests
 from schwab_auth import SchwabAuth
+#from schwab_api_enum import AssetType, Instruction, Session, Duration, OrderType, FrequencyType, PeriodType
 
 
 if not logging.root.handlers:
-    print("No loggin handler at API.py")
+
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
+
+    logging.info("Logging activated at API")
 
 logger = logging.getLogger(__name__)
 
 BASE_MARKET_URL = 'https://api.schwabapi.com/marketdata/v1/'
 BASE_TRADER_URL = 'https://api.schwabapi.com/trader/v1/'
-ADDITIONAL_HEADERS = {'Accept':'application/json'}
-
-
-def prepare_parameter_list(parameter_list = None):
-
-    '''
-    This prepares a parameter that is a list for an API request. If
-    the list contains more than one item uit will joint the list
-    using the "," delimiter. If only one itemis in the list then only
-    the first item will be returned.
-
-    NAME: parameter_list
-    DESC:  A List of parameter values assigned to an argument.
-    TYPE: List
-
-    EXAMPLE:
-
-    Object.handle_list(parameter_list = ['MSFT', 'SQ'])
-    '''
-
-    # if more than one item, join.
-    if len(parameter_list) > 1:
-        parameter_list = ','.join(parameter_list)
-    else: # take the first item.
-        parameter_list = parameter_list[0]
-
-    return parameter_list
-
+ADDITIONAL_HEADERS = {'Content-Type':'application/json'}
 
 class SchwabApi():
     '''
-	TD Ameritrade API Class.
+	Schwab API Class.
 
-	Performs request to the TD Ameritrade API. Response in JSON format.
+	Performs request to the Schwab API. Response in JSON format.
     '''
-
-
     def __init__(self, config):
 
         '''
@@ -69,10 +44,10 @@ class SchwabApi():
         It will be use in the headers method to send a valid token.
         '''
 
-        self.auth = SchwabAuth(config)
+        self._auth = SchwabAuth(config)
 
         #self._auth.authenticate()
-        if self.auth:
+        if self._auth:
             self.principals = self.get_user_preference()
             accounts = self.get_account_numbers()
             self.account_hash = accounts[0]['hashValue']
@@ -88,11 +63,12 @@ class SchwabApi():
         '''
 
         # define the string representation
-        return str(self.auth)
+        return str(self._auth)
 
+    def _make_request(self, method: Callable, base_url: str, endpoint: str,
+                      additional_headers: Optional[Dict[str, str]] = None, **kwargs: Any):
 
-    def _make_request(self, method, base_url, endpoint, additional_headers = None, **kwargs):
-        headers = self.auth.get_headers()
+        headers = self._auth.get_headers()
         if additional_headers:
             headers.update(additional_headers)
         url = up.urljoin(base_url, endpoint.lstrip('/'))
@@ -100,10 +76,20 @@ class SchwabApi():
         try:
             response = method(url, headers=headers, verify=True, timeout=10, **kwargs)
             response.raise_for_status()
-            return response.json()
+            if response.content:
+                return response.json()
+            return response
+
         except requests.exceptions.RequestException as error:
-            logger.error("Error: %s", error)
+            logger.error("Error: %s, Response: %s", error, response.json())
             return None
+
+
+    ########## Public services
+
+    @property
+    def access_token(self):
+        return self._auth.access_token
 
 
     #################
@@ -149,7 +135,7 @@ class SchwabApi():
         return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
 
 
-    def get_accounts(self, *, account_hash = None, fields = None):
+    def get_accounts(self, *, account_hash: Optional[str] = None, fields: Optional[str] = None):
 
         '''
         Account balances, positions, and orders for a specific account.
@@ -194,8 +180,9 @@ class SchwabApi():
     #### Transaction History
 
 
-    def get_transactions(self, start_date, end_date, *, account_hash = None,
-                          transaction_types = None, symbol = None, transaction_id = None):
+    def get_transactions(self, start_date: str, end_date: str, *, account_hash: Optional[str] = None,
+                          transaction_types: Optional[str] = None, symbol: Optional[str] = None,
+                          transaction_id: Optional[str]= None):
 
         '''
         Serves to make a request to the "Get Transactions" and "Get Transaction" Endpoint.
@@ -204,35 +191,23 @@ class SchwabApi():
 
         Documentation Link: https://developer.tdameritrade.com/transaction-history/apis
 
-        NAME: account
-        DESC: The account number you wish to recieve transactions for.
-        TYPE: string
+        account_hash: The account number you wish to recieve transactions for.
 
-        NAME: transaction_type
-        DESC: The type of transaction. Only transactions with specified type will be returned. Valid
+        transaction_type: The type of transaction. Only transactions with specified type will be returned. Valid
               values are the following: ALL, TRADE, BUY_ONLY, SELL_ONLY, CASH_INOR_CASH_OUT,
                                         CHECKING, DIVIDEND, INTEREST, ITHER, ADVISOR_FEES
-        TYPE: String
 
-        NAME: symbol
-        DESC: The symbol in the specified transaction. Only transactions with the specified
+        symbol: The symbol in the specified transaction. Only transactions with the specified
               symbol will be returned.
-        TYPE: string
 
-        NAME: start_date
-        DESC: Only transactions after the start date (included) will be returned. Note: the Max date
+        start_date: Only transactions after the start date (included) will be returned. Note: the Max date
               range is one year. Valid ISO-8601 formats are: yyyy-MM-dd.
-        TYPE: String
 
-        NAME: end_date
-        DESC: Only transactions before the End Date (included) will be returned. Mote: the max date
+        end_date: Only transactions before the End Date (included) will be returned. Mote: the max date
               range is one year. Valid ISO-8601 formats are: yyyy-MM-dd
-        TYPE: String
 
-        NAME: transaction_id
-        DESC: The transaction ID you wish to search. If this is specified a "Get transaction"request
+        transaction_id: The transaction ID you wish to search. If this is specified a "Get transaction"request
               is made. Should only be used if you wish to return one transaction.
-        TYPE: String
 
         EXAMPLES:
         Object.get_transactions(account = 'MyAccountNum', transaction_type = 'ALL',
@@ -379,7 +354,6 @@ class SchwabApi():
         '''
 
         account_hash = account_hash or self.account_hash
-        #define the endpoint
 
         endpoint = f'/accounts/{account_hash}/orders/{order_id}'
 
@@ -414,14 +388,21 @@ class SchwabApi():
         #make the request
         response = self._make_request(requests.delete, BASE_TRADER_URL, endpoint)
 
+        if response and response.status_code == 200:
+            logger.info("Order %s was successfully CANCELED.", order_id)
+        else:
+            logger.error("Failed to cancel order %s.", order_id)
 
-        if response.status_code == 200:
-            return print(f"Order {order_id} was successfully CANCELED.\n")
-
-        return print(response.content)
 
 
-    def place_order(self,  symbol,  quantity, instruction, asset_type, price = None,
+# =============================================================================
+#     # Function with type hints
+#     def place_order(self, symbol: str, quantity: float, instruction: Instruction, asset_type: AssetType, *,
+#                     price: Optional[float] = None, account_hash: Optional[str] = None, order_type: OrderType = OrderType.MARKET,
+#                     session: Session = Session.NORMAL, duration: Duration = Duration.DAY, order_strategy_type: str = 'SINGLE'):
+# =============================================================================
+
+    def place_order(self,  symbol,  quantity, instruction, asset_type, *,price = None,
                     account_hash = None, order_type = 'MARKET', session = 'NORMAL',
                     duration = 'DAY', order_strategy_type = 'SINGLE'):
 
@@ -483,9 +464,15 @@ class SchwabApi():
                             orderStrategyType = 'SINGLE')
         '''
 
+# =============================================================================
+#         order_type = order_type.value
+#         session = session.value
+#         duration = duration.value
+#         asset_type = asset_type.value
+# =============================================================================
 
         #define the payload
-        if order_type[:6] == 'MARKET':
+        if order_type in ('MARKET','MARKET_ON_CLOSE'):
             price = None
 
         if order_type != 'STOP':
@@ -516,11 +503,11 @@ class SchwabApi():
         response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
                                       ADDITIONAL_HEADERS, data = json.dumps(payload))
 
-        if response.status_code == 201:
-            return print(f"New {symbol} order was successfully created.\n")
 
-        return print(response.content)
-
+        if response and response.status_code == 201:
+            logger.info("New %s order was successfully created.", symbol)
+        else:
+            logger.error("Failed to create new order for %s.", symbol)
 
     def replace_order(self,  order_id, symbol, quantity, instruction, asset_type,
                       price = None, account_hash = None, order_type = 'MARKET',
@@ -558,10 +545,11 @@ class SchwabApi():
         response = self._make_request(requests.put, BASE_TRADER_URL, endpoint,
                                       ADDITIONAL_HEADERS, data = json.dumps(payload))
 
-        if response.status_code == 201:
-            return print(f"Order {order_id} was successfully replaced.\n")
+        if response and response.status_code == 201:
+            logger.info("Order %s was successfully replaced.", order_id)
+        else:
+            logger.error("Failed to replace order %s.", order_id)
 
-        return print(response.content)
 
 
     def preview_order(self,  symbol, quantity, instruction, asset_type, price = None,
@@ -600,17 +588,14 @@ class SchwabApi():
         response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
                                       ADDITIONAL_HEADERS, data = json.dumps(payload))
 
-        if response.status_code == 201:
-            return print(f"New {symbol} preview order was successfully created.\n")
-
-        return print(response.content)
-
-
+        if response and response.status_code == 201:
+            logger.info("New %s preview order was successfully created.", symbol)
+        else:
+            logger.error("Failed to preview order for %s.", symbol)
 
     ################
     #### MARKET DATA
     ################
-
 
     #### Instruments
 
@@ -711,7 +696,9 @@ class SchwabApi():
         if markets == 'all':
             markets = ['EQUITY', 'OPTION', 'FUTURE', 'BOND','FOREX']
 
-        markets = prepare_parameter_list(markets)
+
+        markets = ','.join(markets)
+        #markets = prepare_parameter_list(markets)
 
         params = {'markets': markets,
                 'date': date}
@@ -739,7 +726,8 @@ class SchwabApi():
         Object.get_market_hours(market = 'EQUITY')
         '''
 
-        params = {'date': date}
+        params = {'markets': market_id,
+                'date': date}
 
         endpoint = f'/markets/{market_id}'
 
@@ -786,7 +774,7 @@ class SchwabApi():
     #### Quotes
 
 
-    def get_quotes(self, symbols, fields = None, indicative = 'false'):
+    def get_quotes(self, symbols: list, fields = None, indicative = 'false'):
 
         '''
         Serves as the mechanism to make a request to Get Quotes Endpoint.
@@ -804,9 +792,10 @@ class SchwabApi():
         fields = quote, fundamental, extended, reference, regular  default = all
         '''
 
-        symbols = prepare_parameter_list(parameter_list = symbols)
+        symbols = ','.join(symbols)
+        #symbols = prepare_parameter_list(parameter_list = symbols)
 
-        params = {'symbol': symbols,
+        params = {'symbols': symbols,
                   'fields': fields,
                   'indicative': indicative}
 
@@ -823,10 +812,9 @@ class SchwabApi():
         return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-
     #### Price History
 
-    def pricehistory_period(self, symbol, frequency_type, frequency, period_type, period,
+    def get_pricehistory_period(self, symbol, frequency_type = 'minute', frequency=1, period_type = 'day', period = 10,
                             need_extendedhours_data = 'true', need_previousclose_price = 'true'):
 
         '''
@@ -893,7 +881,7 @@ class SchwabApi():
         return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-    def pricehistory_dates(self, symbol, frequency_type, frequency,
+    def get_pricehistory_dates(self, symbol, frequency_type, frequency,
                           end_date = datetime.now(), start_date = datetime.now(),
                           need_extendedhours_data = 'true', need_previousclose_price = 'true'):
 

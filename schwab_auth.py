@@ -11,16 +11,20 @@ import secrets
 import urllib.parse as up
 import logging
 from datetime import datetime, timedelta
+from typing import Dict, Optional, Union
 import requests
 
+
+
 if not logging.root.handlers:
-    print("No loggin handler at Authentication")
+
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.info("Logging activated at Authentication")
 
 logger = logging.getLogger(__name__)
 
-class SchwabAuth():
+class SchwabAuth:
 
     """
     Schwab API Authentication Class.
@@ -45,7 +49,7 @@ class SchwabAuth():
     REFRESH_DURATION = 7776000
 
 
-    def __init__(self, config: dict, store_refresh_token: bool  = True,
+    def __init__(self, config: dict[str, str], store_refresh_token: bool  = True,
                  single_access: bool = False):
 
         """
@@ -77,7 +81,7 @@ class SchwabAuth():
         self._initialize_authentication()
         logger.info("Schwab authentication initialized")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Defines the string representation of the SchwabAuthentication instance.
 
@@ -89,7 +93,7 @@ class SchwabAuth():
         return str(self.logged_in_state)
 
 
-    def _initialize_authentication(self):
+    def _initialize_authentication(self) -> None:
         """
         Initializes authentication logic, handling refresh token persistence or renewal.
         """
@@ -110,7 +114,7 @@ class SchwabAuth():
 
 #### CODE AND REFRESH TOKEN
 
-    def _obtain_access_code(self) -> str:
+    def _obtain_access_code(self) -> Optional[str]:
         """
         Retrieves an access code for requesting a refresh token.
 
@@ -143,7 +147,7 @@ class SchwabAuth():
         return query_params.get('code', [None])[0]
 
 
-    def _update_refresh_token(self, token_response: dict):
+    def _update_refresh_token(self, token_response: Dict[str, Union[str, int]]) -> None:
         """
         Updates the refresh token and its expiration time based on the provided token
         response dictionary.
@@ -164,7 +168,7 @@ class SchwabAuth():
                              self._tokens['refresh_expiration']], file)
 
 
-    def _obtain_refresh_token(self):
+    def _obtain_refresh_token(self) -> None:
         """
         Requests a refresh token and access token from the Schwab API by providing an access code,
         client ID, and redirect URI.
@@ -197,7 +201,8 @@ class SchwabAuth():
 
 #### REQUEST TOKENS
 
-    def _request_token(self, grant_type: str, extra_payload: dict):
+    def _request_token(self, grant_type: str,
+                       extra_payload: Dict[str, str]) -> Optional[Dict[str, Union[str, int]]]:
         """
         Makes a request to the Schwab API to obtain a token.
 
@@ -236,7 +241,7 @@ class SchwabAuth():
 
 #### ACCESS TOKEN
 
-    def _obtain_access_token(self) -> requests.Response:
+    def _obtain_access_token(self) -> Optional[requests.Response]:
         """
         Makes a request to refresh the access token using the current refresh token.
 
@@ -258,10 +263,7 @@ class SchwabAuth():
             self._obtain_refresh_token()
 
 
-
-
-
-    def _update_access_token(self, token_response: dict):
+    def _update_access_token(self, token_response: Dict[str, Union[str, int]]) -> None:
         """
         Updates the access token and its expiration time based on
         the provided token response dictionary.
@@ -292,7 +294,7 @@ class SchwabAuth():
 
 
 #### AUTHENTICATE
-    def _refresh_access_token(self):
+    def _refresh_access_token(self) -> None:
         """
         Refreshes the access token if it is nearing expiration.
 
@@ -312,7 +314,7 @@ class SchwabAuth():
             self._obtain_access_token()
 
 
-    def _authenticate(self):
+    def _authenticate(self) -> None:
         """
         Verifies the validity of the access token and refreshes it if necessary.
 
@@ -337,7 +339,7 @@ class SchwabAuth():
             self._refresh_access_token()
 
 #### PUBLIC SERVICES
-    def get_headers(self):
+    def get_headers(self) -> Optional[Dict[str, str]]:
         """
         Returns the headers required for authenticated API calls.
 
@@ -346,8 +348,8 @@ class SchwabAuth():
         Otherwise, it logs an error and returns None.
 
         Returns:
-            dict: Headers containing the authorization bearer token.
-            None: If authentication fails.
+            dict: A dictionary containing the 'Authorization' header with the access token.
+            None: If the user is not logged in.
         """
 
         self._authenticate()
