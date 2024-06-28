@@ -37,6 +37,7 @@ Handles Authentication, WebSocket streaming subscriptions and API requests.
 
 ### Test:
     Examples on each API endpoint and working streamer subscriptions
+    Generate a test log with a complete responses on each ENDPOINT
 
 ### Next Steps:
 
