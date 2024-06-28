@@ -8,6 +8,7 @@ Created on Sun Jun 23 16:57:30 2024
 
 from enum import Enum
 
+#### API
 #### ACCOUNT DATA
 
 #### Orders
@@ -35,6 +36,7 @@ class Status(Enum):
     EXPIRED = 'EXPIRED'
     NEW = 'NEW'
     UNKNOWN = 'UNKNOWN'
+    NONE = None
 
 #### POST
 
@@ -350,14 +352,53 @@ class FrequencyType(Enum):
     YTD_WEEKLY = 'weekly'  #default
 
 class Frequency(Enum):
-    MINUTE_1 = 1  #Default
-    MINUTE_5 = 5
-    MINUTE_10 = 10
-    MINUTE_15 = 15
-    MINUTE_30 = 30
-    DAILY_1 = 1
-    WEEKLY_1 = 1
-    MONTHLY_1 = 1
+    _1_MINUTE = 1  #Default
+    _5_MINUTE = 5
+    _10_MINUTE = 10
+    _15_MINUTE = 15
+    _30_MINUTE = 30
+    DAILY = 1
+    WEEKLY = 1
+    MONTHLY = 1
+
+class FrequencyCombination1(Enum):
+    DAY_1_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._1_MINUTE)
+    DAY_5_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._5_MINUTE)
+    DAY_10_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._10_MINUTE)
+    DAY_15_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._15_MINUTE)
+    DAY_30_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._30_MINUTE)
+
+    MONTH_DAILY = (FrequencyType.MONTH_DAILY, Frequency.DAILY)
+    MONTH_WEEKLY = (FrequencyType.MONTH_WEEKLY, Frequency.WEEKLY)
+
+    YEAR_DAILY = (FrequencyType.YEAR_DAILY, Frequency.DAILY)
+    YEAR_WEEKLY = (FrequencyType.YEAR_WEEKLY, Frequency.WEEKLY)
+    YEAR_MONTHLY = (FrequencyType.YEAR_MONTHLY, Frequency.MONTHLY)
+
+    YTD_DAILY = (FrequencyType.YTD_DAILY, Frequency.DAILY)
+    YTD_WEEKLY = (FrequencyType.YTD_WEEKLY, Frequency.WEEKLY)
+
+
+class FrequencyCombination2(Enum):
+    _1_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._1_MINUTE)
+    _5_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._5_MINUTE)
+    _10_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._10_MINUTE)
+    _15_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._15_MINUTE)
+    _30_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._30_MINUTE)
+
+
+    DAILY_MONTH = (FrequencyType.MONTH_DAILY, Frequency.DAILY)
+    DAILY_YEAR = (FrequencyType.YEAR_DAILY, Frequency.DAILY)
+    DAILY_YTD = (FrequencyType.YTD_DAILY, Frequency.DAILY)
+
+    WEEKLY_MONTH = (FrequencyType.MONTH_WEEKLY, Frequency.WEEKLY)
+    WEEKLY_YEAR = (FrequencyType.YEAR_WEEKLY, Frequency.WEEKLY)
+    WEEKLY_YTD = (FrequencyType.YTD_WEEKLY, Frequency.WEEKLY)
+
+    MONTHLY_YEAR = (FrequencyType.YEAR_MONTHLY, Frequency.MONTHLY)
+
+
+
 
 #### Quotes
 class Fields(Enum):  ##Quotes
@@ -423,3 +464,63 @@ class FeeType(Enum):
     TEFRA_TAX = 'TEFRA_TAX'
     STATE_TAX = 'STATE_TAX'
     UNKNOWN = 'UNKNOWN'
+
+
+
+#### STREAMER
+
+class Command(Enum):
+    SUBS = 'SUBS'
+    UNSUBS = 'UNSUBS'
+    ADD = 'ADD'
+
+
+class Venue(Enum):
+    CALLS = "CALLS"
+    OPTS = "OPTS"
+    PUTS = "PUTS"
+    CALLS_DESC = "CALLS-DESC"
+    OPTS_DESC = "OPTS-DESC"
+    PUTS_DESC = "PUTS-DESC"
+
+class Stream_Duration(Enum):
+    ALL_DAY = "ALL"
+    DURATION_60MIN = "3600"
+    DURATION_30MIN = "1800"
+    DURATION_10MIN = "600"
+    DURATION_5MIN = "300"
+    DURATION_1MIN = "60"
+
+class Stream_Frequency(Enum):
+    M1 = "m1"
+    M5 = "m5"
+    M10 = "m10"
+    M30 = "m30"
+    H1 = "h1"
+    D1 = "d1"
+    W1 = "w1"
+    N1 = "n1"
+
+class Stream_Period(Enum):
+    D5 = "d5"
+    W4 = "w4"
+    N10 = "n10"
+    Y1 = "y1"
+    Y10 = "y10"
+
+# =============================================================================
+# def subs_request_account_activity(self, command=Command.SUBS,
+#                                   fields='0,1,2,3', store_flag=True):
+#     '''
+#     This service is used to request streaming updates for one or
+#     more accounts associated with the logged in User ID.
+#     Common usage would involve issuing the OrderStatus API request
+#     to get all transactions for an account, and subscribing
+#     to ACCT_ACTIVITY to get any updates.
+#     '''
+#     subs_request = ["ACCT_ACTIVITY", "3", command.value,
+#                     self._ws.streamer_info.get("schwabClientCorrelId"),
+#                     fields, store_flag]
+#
+#     self.subs_manager(subs_request)
+# ===========================================================================

@@ -135,141 +135,7 @@ class SchwabStreamerClient():
         self._ws.send_logout_request()
 
 
-    #### GET REQUEST ##########################
 
-    def data_request_news_headlinelist(self, keys = 'SPY, AAPL'):
-
-        '''
-        NAME: keys
-        DESC: Symbols in upper case and separated by commas
-        TYPE: String
-
-        Snapshot fields:
-                        1	??
-                        2	list amount
-                        3	list
-                        key	symbol
-
-        EXAMPLES:
-        SessionObject.data_request_news_headlinelist(keys = 'SPY')
-        '''
-
-        data_request= {
-                       "service": "NEWS_HEADLINELIST",
-                       "requestid": "29",
-                       "command": 'GET',
-                       "parameters": {
-                                     "keys": keys,
-                                     }
-                       }
-        self._ws.send_request(data_request)
-
-    def data_request_news_story(self, keys):
-
-        '''
-        NAME: keys
-        DESC: StoryID
-        TYPE: String
-
-        Snapshot fields:
-                        1	??
-                        2	timestamp
-                        3	story_id
-                        4	??
-                        5	story_id
-                        6	Story
-                        7	source
-                        keys	story_id
-
-        EXAMPLES:
-        SessionObject.data_request_news_story(keys = 'SN20191111010526')
-        '''
-
-        data_request= {
-                       "service": "NEWS_STORY",
-                       "requestid": "30",
-                       "command": 'GET',
-                       "parameters": {
-                                     "keys": keys,
-                                     }
-                       }
-
-        self._ws.send_request(data_request)
-
-    def data_request_chart_history_futures(self, symbol = '/ES',
-                                           frequency = 'm5', period = 'd5',
-                                           start_time = None, end_time = None):
-
-        '''
-        Chart history for equities is available via requests to the MDMS services.
-        Only Futures chart history is available via Streamer Server.
-
-        NAME: symbol
-        DESC: Symbols in upper case and separated by commas
-        TYPE: String
-
-        NAME: frequency
-        DESC: Sample Size of the candle: Fixed frequency choices:
-                                                    m1, m5, m10, m30, h1, d1, w1, n1
-                                                    (m=minute, h=hour, d=day, w=week, n=month)
-        TYPE: String
-
-        NAME: period
-        DESC: Period (not required if START_TIME & END_TIME are sent).
-              The number of periods to show.Flexible time period examples:
-                                                                d5, w4, n10, y1, y10
-                                                                (d=day, w=week, n=month, y=year)
-        TYPE: String
-
-        NAME: start_Time
-        DESC: Start time
-        TYPE: String
-
-        NAME: end_Time
-        DESC: End time
-        TYPE: String
-
-        Snapshot fields:
-        Field   Field Name          Type        Field Description
-        0   	key                	String     	Ticker symbol in upper case.
-        1   	Chart Time         	long       	Milliseconds since Epoch
-        2   	Open Price         	double     	Opening price for the minute
-        3    	High Price        	double     	Highest price for the minute
-        4   	Low Price          	double     	Chart’s lowest price for the minute
-        5   	Close Price        	double     	Closing price for the minute
-        6   	Volume             	doulbe     	Total volume for the minute
-
-
-        TYPE: String
-
-        EXAMPLES:
-        SessionObject.data_request_chart_history_futures(keys = '/ES', frequecy = 'm5',
-                                                         period = 'd5')
-        '''
-
-        if end_time is not None and start_time is not None:
-
-            epoch = datetime.utcfromtimestamp(0)
-            end_date = int((end_time - epoch).total_seconds()*1000)
-            start_date = int((start_time - epoch).total_seconds()*1000)
-
-        else:
-            end_date = None
-            start_date = None
-
-        data_request= {
-                      "service": "CHART_HISTORY_FUTURES",
-                      "requestid": "31",
-                      "command": 'GET',
-                      "parameters": {
-                                     "symbol": symbol,
-                                     "frequency": frequency,
-                                     "period": period,
-                                     "END_TIME": end_date,
-                                     "START_TIME": start_date,
-                                    }
-                    }
-        self._ws.send_request(data_request)
 
 
     #### SUBSCRIPTION REQUESTS ##################
@@ -1531,3 +1397,139 @@ class SchwabStreamerClient():
         subs_request = ["NEWS_HEADLINE", "28", command, keys, fields, store_flag]
 
         self.subs_manager(subs_request)
+
+    #### GET REQUEST ##########################
+
+    def data_request_news_headlinelist(self, keys = 'SPY, AAPL'):
+
+        '''
+        NAME: keys
+        DESC: Symbols in upper case and separated by commas
+        TYPE: String
+
+        Snapshot fields:
+                        1	??
+                        2	list amount
+                        3	list
+                        key	symbol
+
+        EXAMPLES:
+        SessionObject.data_request_news_headlinelist(keys = 'SPY')
+        '''
+
+        data_request= {
+                       "service": "NEWS_HEADLINELIST",
+                       "requestid": "29",
+                       "command": 'GET',
+                       "parameters": {
+                                     "keys": keys,
+                                     }
+                       }
+        self._ws.send_request(data_request)
+
+    def data_request_news_story(self, keys):
+
+        '''
+        NAME: keys
+        DESC: StoryID
+        TYPE: String
+
+        Snapshot fields:
+                        1	??
+                        2	timestamp
+                        3	story_id
+                        4	??
+                        5	story_id
+                        6	Story
+                        7	source
+                        keys	story_id
+
+        EXAMPLES:
+        SessionObject.data_request_news_story(keys = 'SN20191111010526')
+        '''
+
+        data_request= {
+                       "service": "NEWS_STORY",
+                       "requestid": "30",
+                       "command": 'GET',
+                       "parameters": {
+                                     "keys": keys,
+                                     }
+                       }
+
+        self._ws.send_request(data_request)
+
+    def data_request_chart_history_futures(self, symbol = '/ES',
+                                           frequency = 'm5', period = 'd5',
+                                           start_time = None, end_time = None):
+
+        '''
+        Chart history for equities is available via requests to the MDMS services.
+        Only Futures chart history is available via Streamer Server.
+
+        NAME: symbol
+        DESC: Symbols in upper case and separated by commas
+        TYPE: String
+
+        NAME: frequency
+        DESC: Sample Size of the candle: Fixed frequency choices:
+                                                    m1, m5, m10, m30, h1, d1, w1, n1
+                                                    (m=minute, h=hour, d=day, w=week, n=month)
+        TYPE: String
+
+        NAME: period
+        DESC: Period (not required if START_TIME & END_TIME are sent).
+              The number of periods to show.Flexible time period examples:
+                                                                d5, w4, n10, y1, y10
+                                                                (d=day, w=week, n=month, y=year)
+        TYPE: String
+
+        NAME: start_Time
+        DESC: Start time
+        TYPE: String
+
+        NAME: end_Time
+        DESC: End time
+        TYPE: String
+
+        Snapshot fields:
+        Field   Field Name          Type        Field Description
+        0   	key                	String     	Ticker symbol in upper case.
+        1   	Chart Time         	long       	Milliseconds since Epoch
+        2   	Open Price         	double     	Opening price for the minute
+        3    	High Price        	double     	Highest price for the minute
+        4   	Low Price          	double     	Chart’s lowest price for the minute
+        5   	Close Price        	double     	Closing price for the minute
+        6   	Volume             	doulbe     	Total volume for the minute
+
+
+        TYPE: String
+
+        EXAMPLES:
+        SessionObject.data_request_chart_history_futures(keys = '/ES', frequecy = 'm5',
+                                                         period = 'd5')
+        '''
+
+        if end_time is not None and start_time is not None:
+
+            epoch = datetime.utcfromtimestamp(0)
+            end_date = int((end_time - epoch).total_seconds()*1000)
+            start_date = int((start_time - epoch).total_seconds()*1000)
+
+        else:
+            end_date = None
+            start_date = None
+
+        data_request= {
+                      "service": "CHART_HISTORY_FUTURES",
+                      "requestid": "31",
+                      "command": 'GET',
+                      "parameters": {
+                                     "symbol": symbol,
+                                     "frequency": frequency,
+                                     "period": period,
+                                     "END_TIME": end_date,
+                                     "START_TIME": start_date,
+                                    }
+                    }
+        self._ws.send_request(data_request)

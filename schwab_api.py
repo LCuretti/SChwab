@@ -12,7 +12,7 @@ import urllib.parse as up
 import logging
 import requests
 from schwab_auth import SchwabAuth
-#from schwab_api_enum import AssetType, Instruction, Session, Duration, OrderType, FrequencyType, PeriodType
+from schwab_enum import Status#, AssetType, Instruction, Session, Duration, OrderType, FrequencyType, PeriodType
 
 
 if not logging.root.handlers:
@@ -74,7 +74,7 @@ class SchwabApi():
         url = up.urljoin(base_url, endpoint.lstrip('/'))
 
         try:
-            response = method(url, headers=headers, verify=True, timeout=10, **kwargs)
+            response = method(url, headers=headers, verify=True, timeout=30, **kwargs)
             response.raise_for_status()
             if response.content:
                 return response.json()
@@ -239,7 +239,7 @@ class SchwabApi():
     #### Orders
 
     def get_orders(self, from_entered_datetime, to_entered_datetime,
-                       *, max_results=None, status=None):
+                       *, max_results=None, status=Status.NONE):
         '''Orders for all linked accounts. Optionally specify a single status on
         which to filter.
 
@@ -255,11 +255,10 @@ class SchwabApi():
                        :class:`Order.Status` for options.
         '''
         endpoint = '/orders'
-
         params = {"maxResults": max_results,
                 "fromEnteredTime": from_entered_datetime,
                 "toEnteredTime": to_entered_datetime,
-                "status": status}
+                "status": status.value}
 
         return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
 
@@ -747,15 +746,6 @@ class SchwabApi():
         DESC: The index symbol to get movers for. Can be $DJI, $COMPX, or $SPX.X.
         TYPE: String
 
-        NAME: direction
-        DESC: To return movers with the specified directions of up or down. Valid values
-             are "up" or "down"
-        TYPE: String
-
-        NAME: change
-        DESC: Toreturn movers with the specified change types of percent or value. Valid
-              values are "percent" or "value".
-        TYPE: String
 
         EXAMPLES:
         SessionObjec.get_movers(market = $DJI', direction = 'up', change = 'Value')
