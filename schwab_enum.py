@@ -9,8 +9,11 @@ Created on Sun Jun 23 16:57:30 2024
 from enum import Enum
 
 #### API
-#### ACCOUNT DATA
+class BaseUrl(Enum):
+    MARKET = 'https://api.schwabapi.com/marketdata/v1/'
+    TRADER = 'https://api.schwabapi.com/trader/v1/'
 
+#### ACCOUNT DATA
 #### Orders
 
 #### GET
@@ -206,7 +209,7 @@ class TransactionType(Enum):
     MARGIN_CALL = 'ARGIN_CALL'
     MONEY_MARKET = 'MONEY_MARKET'
     SMA_ADJUSTMENT = 'SMA_ADJUSTMENT'
-    ALL = 'ALL'
+    NONE = None
 
 #### MARKET DATA
 
@@ -291,6 +294,7 @@ class Sort(Enum):
     TRADES = 'TRADES'
     PERCENT_CHANGE_UP = 'PERCENT_CHANGE_UP'
     PERCENT_CHANGE_DOWN = 'PERCENT_CHANGE_DOWN'
+    NONE = None
 
 class MoversFrequency(Enum):
     ZERO = 0   #Default
@@ -299,6 +303,7 @@ class MoversFrequency(Enum):
     TEN = 10
     THIRTY = 30
     SIXTY = 60
+    NONE = None
 
 class SymbolId(Enum):
     DJI = '$DJI'
@@ -352,21 +357,21 @@ class FrequencyType(Enum):
     YTD_WEEKLY = 'weekly'  #default
 
 class Frequency(Enum):
-    _1_MINUTE = 1  #Default
-    _5_MINUTE = 5
-    _10_MINUTE = 10
-    _15_MINUTE = 15
-    _30_MINUTE = 30
+    MINUTE_1 = 1  #Default
+    MINUTE_5 = 5
+    MINUTE_10 = 10
+    MINUTE_15 = 15
+    MINUTE_30 = 30
     DAILY = 1
     WEEKLY = 1
     MONTHLY = 1
 
 class FrequencyCombination1(Enum):
-    DAY_1_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._1_MINUTE)
-    DAY_5_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._5_MINUTE)
-    DAY_10_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._10_MINUTE)
-    DAY_15_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._15_MINUTE)
-    DAY_30_MINUTE = (FrequencyType.DAY_MINUTE, Frequency._30_MINUTE)
+    DAY_1_MINUTE = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_1)
+    DAY_5_MINUTE = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_5)
+    DAY_10_MINUTE = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_10)
+    DAY_15_MINUTE = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_15)
+    DAY_30_MINUTE = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_30)
 
     MONTH_DAILY = (FrequencyType.MONTH_DAILY, Frequency.DAILY)
     MONTH_WEEKLY = (FrequencyType.MONTH_WEEKLY, Frequency.WEEKLY)
@@ -380,11 +385,11 @@ class FrequencyCombination1(Enum):
 
 
 class FrequencyCombination2(Enum):
-    _1_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._1_MINUTE)
-    _5_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._5_MINUTE)
-    _10_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._10_MINUTE)
-    _15_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._15_MINUTE)
-    _30_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency._30_MINUTE)
+    _1_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_1)
+    _5_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_5)
+    _10_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_10)
+    _15_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_15)
+    _30_MINUTE_DAY = (FrequencyType.DAY_MINUTE, Frequency.MINUTE_30)
 
 
     DAILY_MONTH = (FrequencyType.MONTH_DAILY, Frequency.DAILY)
@@ -408,6 +413,7 @@ class Fields(Enum):  ##Quotes
     REFERENCE = 'reference'
     REGULAR = 'regular'
     ALL = 'all' #default
+    NONE = None
 
 #### OTHERS
 
@@ -465,15 +471,12 @@ class FeeType(Enum):
     STATE_TAX = 'STATE_TAX'
     UNKNOWN = 'UNKNOWN'
 
-
-
 #### STREAMER
 
 class Command(Enum):
     SUBS = 'SUBS'
     UNSUBS = 'UNSUBS'
     ADD = 'ADD'
-
 
 class Venue(Enum):
     CALLS = "CALLS"
@@ -483,7 +486,7 @@ class Venue(Enum):
     OPTS_DESC = "OPTS-DESC"
     PUTS_DESC = "PUTS-DESC"
 
-class Stream_Duration(Enum):
+class StreamDuration(Enum):
     ALL_DAY = "ALL"
     DURATION_60MIN = "3600"
     DURATION_30MIN = "1800"
@@ -491,7 +494,7 @@ class Stream_Duration(Enum):
     DURATION_5MIN = "300"
     DURATION_1MIN = "60"
 
-class Stream_Frequency(Enum):
+class StreamFrequency(Enum):
     M1 = "m1"
     M5 = "m5"
     M10 = "m10"
@@ -501,26 +504,9 @@ class Stream_Frequency(Enum):
     W1 = "w1"
     N1 = "n1"
 
-class Stream_Period(Enum):
+class StreamPeriod(Enum):
     D5 = "d5"
     W4 = "w4"
     N10 = "n10"
     Y1 = "y1"
     Y10 = "y10"
-
-# =============================================================================
-# def subs_request_account_activity(self, command=Command.SUBS,
-#                                   fields='0,1,2,3', store_flag=True):
-#     '''
-#     This service is used to request streaming updates for one or
-#     more accounts associated with the logged in User ID.
-#     Common usage would involve issuing the OrderStatus API request
-#     to get all transactions for an account, and subscribing
-#     to ACCT_ACTIVITY to get any updates.
-#     '''
-#     subs_request = ["ACCT_ACTIVITY", "3", command.value,
-#                     self._ws.streamer_info.get("schwabClientCorrelId"),
-#                     fields, store_flag]
-#
-#     self.subs_manager(subs_request)
-# ===========================================================================

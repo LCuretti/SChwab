@@ -7,12 +7,14 @@ Created on Thu Nov  7 08:23:24 2019
 
 from datetime import datetime
 import json
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 import urllib.parse as up
 import logging
 import requests
 from schwab_auth import SchwabAuth
-from schwab_enum import Status#, AssetType, Instruction, Session, Duration, OrderType, FrequencyType, PeriodType
+from schwab_enum import (Status, TransactionType, AssetType, Instruction, Session, Duration,
+                         OrderType, OrderStrategyType, Projection, Market, SymbolId, Sort,
+                         MoversFrequency, Fields, FrequencyType, Frequency, PeriodType, Period)
 
 
 if not logging.root.handlers:
@@ -180,8 +182,10 @@ class SchwabApi():
     #### Transaction History
 
 
-    def get_transactions(self, start_date: str, end_date: str, *, account_hash: Optional[str] = None,
-                          transaction_types: Optional[str] = None, symbol: Optional[str] = None,
+    def get_transactions(self, start_date: str, end_date: str, *,
+                         account_hash: Optional[str] = None,
+                          transaction_type: Optional[str] = TransactionType.NONE ,
+                          symbol: Optional[str] = None,
                           transaction_id: Optional[str]= None):
 
         '''
@@ -193,20 +197,21 @@ class SchwabApi():
 
         account_hash: The account number you wish to recieve transactions for.
 
-        transaction_type: The type of transaction. Only transactions with specified type will be returned. Valid
-              values are the following: ALL, TRADE, BUY_ONLY, SELL_ONLY, CASH_INOR_CASH_OUT,
-                                        CHECKING, DIVIDEND, INTEREST, ITHER, ADVISOR_FEES
+        transaction_type: The type of transaction. Only transactions with specified type will
+        be returned. Valid values are the following: ALL, TRADE, BUY_ONLY, SELL_ONLY,
+                    CASH_INOR_CASH_OUT, CHECKING, DIVIDEND, INTEREST, ITHER, ADVISOR_FEES
 
         symbol: The symbol in the specified transaction. Only transactions with the specified
               symbol will be returned.
 
-        start_date: Only transactions after the start date (included) will be returned. Note: the Max date
-              range is one year. Valid ISO-8601 formats are: yyyy-MM-dd.
+        start_date: Only transactions after the start date (included) will be returned.
+        Note: the Max date range is one year. Valid ISO-8601 formats are: yyyy-MM-dd.
 
-        end_date: Only transactions before the End Date (included) will be returned. Mote: the max date
-              range is one year. Valid ISO-8601 formats are: yyyy-MM-dd
+        end_date: Only transactions before the End Date (included) will be returned.
+        Mote: the max date range is one year. Valid ISO-8601 formats are: yyyy-MM-dd
 
-        transaction_id: The transaction ID you wish to search. If this is specified a "Get transaction"request
+        transaction_id: The transaction ID you wish to search. If this is specified a
+        "Get transaction"request
               is made. Should only be used if you wish to return one transaction.
 
         EXAMPLES:
@@ -226,7 +231,7 @@ class SchwabApi():
 
             return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
 
-        params = {'types':transaction_types,
+        params = {'types':transaction_type.value,
                 'symbol':symbol,
                 'startDate':start_date,
                 'endDate':end_date}
@@ -265,7 +270,7 @@ class SchwabApi():
 
 
     def get_account_orders(self, from_entered_time, to_entered_time, *, account_hash = None,
-                           max_results = None, status = None):
+                           max_results = None, status = Status.NONE):
 
         '''
         Returns the savedorders for a specific account.
@@ -326,7 +331,7 @@ class SchwabApi():
         params = {"maxResults": max_results,
                 "fromEnteredTime": from_entered_time,
                 "toEnteredTime": to_entered_time,
-                "status": status}
+                "status": status.value}
 
         endpoint = f'/accounts/{account_hash}/orders'
 
@@ -394,16 +399,17 @@ class SchwabApi():
 
 
 
-# =============================================================================
-#     # Function with type hints
-#     def place_order(self, symbol: str, quantity: float, instruction: Instruction, asset_type: AssetType, *,
-#                     price: Optional[float] = None, account_hash: Optional[str] = None, order_type: OrderType = OrderType.MARKET,
-#                     session: Session = Session.NORMAL, duration: Duration = Duration.DAY, order_strategy_type: str = 'SINGLE'):
-# =============================================================================
-
-    def place_order(self,  symbol,  quantity, instruction, asset_type, *,price = None,
-                    account_hash = None, order_type = 'MARKET', session = 'NORMAL',
-                    duration = 'DAY', order_strategy_type = 'SINGLE'):
+    # Function with type hints
+    def place_order(self, symbol: str,
+                    quantity: float,
+                    instruction: Instruction,
+                    asset_type: AssetType, *,
+                    price: Optional[float] = None,
+                    account_hash: Optional[str] = None,
+                    order_type: OrderType = OrderType.MARKET,
+                    session: Session = Session.NORMAL,
+                    duration: Duration = Duration.DAY,
+                    order_strategy_type: OrderStrategyType = OrderStrategyType.SINGLE):
 
         '''
         Create order. This method does not verify that the symbol or assets type are valid.
@@ -462,135 +468,215 @@ class SchwabApi():
                             orderType = 'LIMIT', session = 'NORMAL', duration = 'DAY',
                             orderStrategyType = 'SINGLE')
         '''
+        try:
 
-# =============================================================================
-#         order_type = order_type.value
-#         session = session.value
-#         duration = duration.value
-#         asset_type = asset_type.value
-# =============================================================================
+            if not isinstance(instruction, Instruction):
+                raise ValueError(
+                    f'instruction must be an instance of Instruction Enum, got {type(instruction)}')
+            if not isinstance(asset_type, AssetType):
+                raise ValueError(
+                    f'asset_type must be an instance of AssetType Enum, got {type(asset_type)}')
+            if not isinstance(order_type, OrderType):
+                raise ValueError(
+                    f'order_type must be an instance of OrderType Enum, got {type(order_type)}')
+            if not isinstance(session, Session):
+                raise ValueError(
+                    f'session must be an instance of Session Enum, got {type(session)}')
+            if not isinstance(duration, Duration):
+                raise ValueError(
+                    f'duration must be an instance of Duration Enum, got {type(duration)}')
+            if not isinstance(order_strategy_type, OrderStrategyType):
+                raise ValueError(
+                    f'order_strategy_type must be an instance of OrderStrategyType Enum, '
+                    f'got {type(order_strategy_type)}')
 
-        #define the payload
-        if order_type in ('MARKET','MARKET_ON_CLOSE'):
-            price = None
+            #define the payload
+            if order_type.value in ('MARKET','MARKET_ON_CLOSE'):
+                price = None
 
-        if order_type != 'STOP':
-            price_type = 'price'
-        else:
-            price_type = 'stopPrice'
-
-
-        payload = {'orderType':order_type,
-                   'session':session,
-                   f'{price_type}': price,
-                   'duration':duration,
-                   'orderStrategyType':order_strategy_type,
-                   'orderLegCollection':[
-                                         {'instruction':instruction,
-                                          'quantity':quantity,
-                                          'instrument':{'symbol':symbol,
-                                                        'assetType':asset_type
-                                                       }
-                                         }
-                                        ]
-              }
-
-        # define the endpoint
-        account_hash = account_hash or self.account_hash
-        endpoint = f'/accounts/{account_hash}/orders'
-
-        response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
-                                      ADDITIONAL_HEADERS, data = json.dumps(payload))
+            if order_type.value != 'STOP':
+                price_type = 'price'
+            else:
+                price_type = 'stopPrice'
 
 
-        if response and response.status_code == 201:
-            logger.info("New %s order was successfully created.", symbol)
-        else:
-            logger.error("Failed to create new order for %s.", symbol)
+            payload = {'orderType':order_type.value,
+                       'session':session.value,
+                       f'{price_type}': price,
+                       'duration':duration.value,
+                       'orderStrategyType':order_strategy_type.value,
+                       'orderLegCollection':[
+                                             {'instruction':instruction.value,
+                                              'quantity':quantity,
+                                              'instrument':{'symbol':symbol,
+                                                            'assetType':asset_type.value
+                                                           }
+                                             }
+                                            ]
+                  }
 
-    def replace_order(self,  order_id, symbol, quantity, instruction, asset_type,
-                      price = None, account_hash = None, order_type = 'MARKET',
-                      session = 'NORMAL', duration = 'DAY', order_strategy_type = 'SINGLE'):
+            # define the endpoint
+            account_hash = account_hash or self.account_hash
+            endpoint = f'/accounts/{account_hash}/orders'
 
-        #define the payload
-        if order_type[:6] == 'MARKET':
-            price = None
-
-        if order_type != 'STOP':
-            price_type = 'price'
-        else:
-            price_type = 'stopPrice'
-
-
-        payload = {'orderType':order_type,
-                   'session':session,
-                   f'{price_type}': price,
-                   'duration':duration,
-                   'orderStrategyType':order_strategy_type,
-                   'orderLegCollection':[
-                                         {'instruction':instruction,
-                                          'quantity':quantity,
-                                          'instrument':{'symbol':symbol,
-                                                        'assetType':asset_type
-                                                       }
-                                         }
-                                        ]
-              }
-
-        # define the endpoint
-        account_hash = account_hash or self.account_hash
-        endpoint = f'/accounts/{account_hash}/orders/{order_id}'
-
-        response = self._make_request(requests.put, BASE_TRADER_URL, endpoint,
-                                      ADDITIONAL_HEADERS, data = json.dumps(payload))
-
-        if response and response.status_code == 201:
-            logger.info("Order %s was successfully replaced.", order_id)
-        else:
-            logger.error("Failed to replace order %s.", order_id)
+            response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
+                                          ADDITIONAL_HEADERS, data = json.dumps(payload))
 
 
+            if response and response.status_code == 201:
+                logger.info("New %s order was successfully created.", symbol)
+            else:
+                logger.error("Failed to create new order for %s.", symbol)
 
-    def preview_order(self,  symbol, quantity, instruction, asset_type, price = None,
-                      account_hash = None, order_type = 'MARKET', session = 'NORMAL',
-                      duration = 'DAY', order_strategy_type = 'SINGLE'):
+        except Exception as error:
+            logger.exception("An error occurred while replacing the order: %s", str(error))
+
+    def replace_order(self, order_id: str,symbol: str, quantity: float,
+                      instruction: Instruction,
+                      asset_type: AssetType, *,
+                      price: Optional[float] = None,
+                      account_hash: Optional[str] = None,
+                      order_type: OrderType = OrderType.MARKET,
+                      session: Session = Session.NORMAL,
+                      duration: Duration = Duration.DAY,
+                      order_strategy_type: OrderStrategyType = OrderStrategyType.SINGLE):
+
+        try:
+            # Validación de tipos en tiempo de ejecución
+            if not isinstance(instruction, Instruction):
+                raise ValueError(
+                    f'instruction must be an instance of Instruction Enum, got {type(instruction)}')
+            if not isinstance(asset_type, AssetType):
+                raise ValueError(
+                    f'asset_type must be an instance of AssetType Enum, got {type(asset_type)}')
+            if not isinstance(order_type, OrderType):
+                raise ValueError(
+                    f'order_type must be an instance of OrderType Enum, got {type(order_type)}')
+            if not isinstance(session, Session):
+                raise ValueError(
+                    f'session must be an instance of Session Enum, got {type(session)}')
+            if not isinstance(duration, Duration):
+                raise ValueError(
+                    f'duration must be an instance of Duration Enum, got {type(duration)}')
+            if not isinstance(order_strategy_type, OrderStrategyType):
+                raise ValueError(
+                    f'order_strategy_type must be an instance of OrderStrategyType Enum, '
+                    f'got {type(order_strategy_type)}')
+
+            #define the payload
+            if order_type.value in ('MARKET','MARKET_ON_CLOSE'):
+                price = None
+
+            if order_type.value != 'STOP':
+                price_type = 'price'
+            else:
+                price_type = 'stopPrice'
+
+            payload = {
+                'orderType': order_type.value,
+                'session': session.value,
+                f'{price_type}': price,
+                'duration': duration.value,
+                'orderStrategyType': order_strategy_type.value,
+                'orderLegCollection': [
+                    {
+                        'instruction': instruction.value,
+                        'quantity': quantity,
+                        'instrument': {
+                            'symbol': symbol,
+                            'assetType': asset_type.value
+                        }
+                    }
+                ]
+            }
+
+            # Define the endpoint
+            account_hash = account_hash or self.account_hash
+            endpoint = f'/accounts/{account_hash}/orders/{order_id}'
+
+            response = self._make_request(requests.put, BASE_TRADER_URL, endpoint,
+                                          ADDITIONAL_HEADERS, data=json.dumps(payload))
+
+            if response and response.status_code == 201:
+                logger.info("Order %s was successfully replaced.", order_id)
+            else:
+                logger.error("Failed to replace order %s.", order_id)
+
+        except Exception as error:
+            logger.exception("An error occurred while replacing the order: %s", str(error))
 
 
-        #define the payload
-        if order_type[:6] == 'MARKET':
-            price = None
-
-        if order_type != 'STOP':
-            price_type = 'price'
-        else:
-            price_type = 'stopPrice'
 
 
-        payload = {'orderType':order_type,
-                   'session':session,
-                   f'{price_type}': price,
-                   'duration':duration,
-                   'orderStrategyType':order_strategy_type,
-                   'orderLegCollection':[
-                                         {'instruction':instruction,
-                                          'quantity':quantity,
-                                          'instrument':{'symbol':symbol,
-                                                        'assetType':asset_type
-                                                       }
-                                         }
-                                        ]
-              }
+    def preview_order(self, symbol: str, quantity: float,
+                      instruction: Instruction,
+                      asset_type: AssetType, *,
+                      price: Optional[float] = None,
+                      account_hash: Optional[str] = None,
+                      order_type: OrderType = OrderType.MARKET,
+                      session: Session = Session.NORMAL,
+                      duration: Duration = Duration.DAY,
+                      order_strategy_type: OrderStrategyType = OrderStrategyType.SINGLE):
 
-        account_hash = account_hash or self.account_hash
-        endpoint = f'/accounts/{account_hash}/previewOrder'
+        try:
+            if not isinstance(instruction, Instruction):
+                raise ValueError(
+                    f'instruction must be an instance of Instruction Enum, got {type(instruction)}')
+            if not isinstance(asset_type, AssetType):
+                raise ValueError(
+                    f'asset_type must be an instance of AssetType Enum, got {type(asset_type)}')
+            if not isinstance(order_type, OrderType):
+                raise ValueError(
+                    f'order_type must be an instance of OrderType Enum, got {type(order_type)}')
+            if not isinstance(session, Session):
+                raise ValueError(
+                    f'session must be an instance of Session Enum, got {type(session)}')
+            if not isinstance(duration, Duration):
+                raise ValueError(
+                    f'duration must be an instance of Duration Enum, got {type(duration)}')
+            if not isinstance(order_strategy_type, OrderStrategyType):
+                raise ValueError(
+                    f'order_strategy_type must be an instance of OrderStrategyType Enum, '
+                    f'got {type(order_strategy_type)}')
 
-        response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
-                                      ADDITIONAL_HEADERS, data = json.dumps(payload))
+            #define the payload
+            if order_type.value in ('MARKET','MARKET_ON_CLOSE'):
+                price = None
 
-        if response and response.status_code == 201:
-            logger.info("New %s preview order was successfully created.", symbol)
-        else:
-            logger.error("Failed to preview order for %s.", symbol)
+            if order_type.value != 'STOP':
+                price_type = 'price'
+            else:
+                price_type = 'stopPrice'
+
+
+            payload = {'orderType':order_type.value,
+                       'session':session.value,
+                       f'{price_type}': price,
+                       'duration':duration.value,
+                       'orderStrategyType':order_strategy_type.value,
+                       'orderLegCollection':[
+                                             {'instruction':instruction.value,
+                                              'quantity':quantity,
+                                              'instrument':{'symbol':symbol,
+                                                            'assetType':asset_type.value
+                                                           }
+                                             }
+                                            ]
+                  }
+
+            account_hash = account_hash or self.account_hash
+            endpoint = f'/accounts/{account_hash}/previewOrder'
+
+            response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
+                                          ADDITIONAL_HEADERS, data = json.dumps(payload))
+
+            if response and response.status_code == 201:
+                logger.info("New %s preview order was successfully created.", symbol)
+            else:
+                logger.error("Failed to preview order for %s.", symbol)
+
+        except Exception as error:
+            logger.exception("An error occurred while replacing the order: %s", str(error))
 
     ################
     #### MARKET DATA
@@ -598,7 +684,7 @@ class SchwabApi():
 
     #### Instruments
 
-    def search_instruments(self, symbol, projection = 'symbol-search'):
+    def search_instruments(self, symbol, projection: Projection = Projection.SYMBOL_SEARCH):
 
         '''
         Search or retrive instrument data, including fundamental data.
@@ -645,7 +731,7 @@ class SchwabApi():
 
         # build the params dictionary
         params = {'symbol':symbol,
-                'projection':projection}
+                'projection':projection.value}
 
         #define the endpoint
         endpoint = '/instruments'
@@ -678,7 +764,7 @@ class SchwabApi():
 
     ####  Market Hours
 
-    def get_markets_hours(self, markets = "all", date = None):
+    def get_markets_hours(self, markets: List[Market] = None, date = None):
 
         '''
         Retrieve market hours for specified markets
@@ -692,14 +778,14 @@ class SchwabApi():
         Object.get_market_hours(markets = ['EQUITY', 'OPTION'], date = '2019-11-18')
         '''
          # build the params dictionary
-        if markets == 'all':
-            markets = ['EQUITY', 'OPTION', 'FUTURE', 'BOND','FOREX']
+        if Market.ALL in markets:
+            markets = [Market.EQUITY, Market.OPTION, Market.FUTURE, Market.BOND, Market.FOREX]
 
 
-        markets = ','.join(markets)
+        market_values = ','.join(market.value for market in markets)
         #markets = prepare_parameter_list(markets)
 
-        params = {'markets': markets,
+        params = {'markets': market_values,
                 'date': date}
 
         endpoint = '/markets'
@@ -707,7 +793,7 @@ class SchwabApi():
         return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-    def get_market_hours(self, market_id, date = None):
+    def get_market_hours(self, market_id: Market, date = None):
 
         '''
         Serves as the mechanism to make a request to the
@@ -725,7 +811,7 @@ class SchwabApi():
         Object.get_market_hours(market = 'EQUITY')
         '''
 
-        params = {'markets': market_id,
+        params = {'markets': market_id.value,
                 'date': date}
 
         endpoint = f'/markets/{market_id}'
@@ -735,7 +821,8 @@ class SchwabApi():
 
     #### Movers
 
-    def get_movers(self, index, *, sort = None, frequency = None):
+    def get_movers(self, index: SymbolId, *, sort: Sort = Sort.NONE,
+                   frequency: MoversFrequency = MoversFrequency.NONE):
 
         '''
         Top 10 (up or down) movers by value or percent for a particular index.
@@ -748,15 +835,15 @@ class SchwabApi():
 
 
         EXAMPLES:
-        SessionObjec.get_movers(market = $DJI', direction = 'up', change = 'Value')
-        SessionObjec.get_movers(market = $COMPX', direction = 'down', change = 'percent')
+        SessionObjec.get_movers(market = $DJI', sort = 'up', frequecy = 'Value')
+        SessionObjec.get_movers(market = $COMPX', sort = 'down', frequency = 'percent')
 
         '''
 
-        params = {'sort': sort,
-                  'frequency':frequency}
+        params = {'sort': sort.value,
+                  'frequency':frequency.value}
 
-        endpoint = f'/movers/{index}'
+        endpoint = f'/movers/{index.value}'
 
         return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
@@ -764,7 +851,7 @@ class SchwabApi():
     #### Quotes
 
 
-    def get_quotes(self, symbols: list, fields = None, indicative = 'false'):
+    def get_quotes(self, symbols: list, fields: Fields = Fields.ALL, indicative: bool = False):
 
         '''
         Serves as the mechanism to make a request to Get Quotes Endpoint.
@@ -783,20 +870,19 @@ class SchwabApi():
         '''
 
         symbols = ','.join(symbols)
-        #symbols = prepare_parameter_list(parameter_list = symbols)
 
         params = {'symbols': symbols,
-                  'fields': fields,
-                  'indicative': indicative}
+                  'fields': fields.value,
+                  'indicative': str(indicative).lower()}
 
         endpoint = '/quotes'
 
         return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
-    def get_quote(self, symbol_id, fields = None):
+    def get_quote(self, symbol_id, fields: Fields = Fields.ALL):
 
 
-        params = {'fields': fields}
+        params = {'fields': fields.value}
         endpoint = f'/{symbol_id}/quotes'
 
         return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
@@ -804,8 +890,13 @@ class SchwabApi():
 
     #### Price History
 
-    def get_pricehistory_period(self, symbol, frequency_type = 'minute', frequency=1, period_type = 'day', period = 10,
-                            need_extendedhours_data = 'true', need_previousclose_price = 'true'):
+    def get_pricehistory_period(self, symbol,
+                                frequency_type: FrequencyType = FrequencyType.DAY_MINUTE,
+                                frequency: Frequency = Frequency.MINUTE_1,
+                                period_type: PeriodType = PeriodType.DAY,
+                                period: Period = Period.DAY_10,
+                                need_extendedhours_data: bool = True,
+                                need_previousclose_price: bool = True):
 
         '''
         Get price history for a symbol defining Period. Its provide data up to the last closed day.
@@ -858,12 +949,12 @@ class SchwabApi():
 
         params = {
                 'symbol': symbol,
-                'frequencyType': frequency_type,
-                'frequency': frequency,
-                'periodType': period_type,
-                'period': period,
-                'needExtendedHoursData': need_extendedhours_data,
-                'needPreviousClose': need_previousclose_price
+                'frequencyType': frequency_type.value,
+                'frequency': frequency.value,
+                'periodType': period_type.value,
+                'period': period.value,
+                'needExtendedHoursData': str(need_extendedhours_data).lower(),
+                'needPreviousClose': str(need_previousclose_price).lower()
                 }
 
         endpoint = '/pricehistory'
@@ -871,9 +962,13 @@ class SchwabApi():
         return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
 
 
-    def get_pricehistory_dates(self, symbol, frequency_type, frequency,
-                          end_date = datetime.now(), start_date = datetime.now(),
-                          need_extendedhours_data = 'true', need_previousclose_price = 'true'):
+    def get_pricehistory_dates(self, symbol,
+                               frequency_type: FrequencyType,
+                               frequency: Frequency,
+                               end_date = datetime.now(),
+                               start_date = datetime.now(),
+                               need_extendedhours_data: bool = True,
+                               need_previousclose_price: bool = True):
 
         '''
         Get price history for symbol defining date Interval. It provides data till the last second.
@@ -902,12 +997,12 @@ class SchwabApi():
 
         params = {
                 'symbol': symbol,
-                'frequencyType': frequency_type,
-                'frequency': frequency,
+                'frequencyType': frequency_type.value,
+                'frequency': frequency.value,
                 'endDate': end_date,
                 'startDate': start_date,
-                'needExtendedHoursData': need_extendedhours_data,
-                'needPreviousClose': need_previousclose_price
+                'needExtendedHoursData': str(need_extendedhours_data).lower(),
+                'needPreviousClose': str(need_previousclose_price).lower()
                 }
 
         # define the endpoint
