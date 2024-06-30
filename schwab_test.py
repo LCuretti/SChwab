@@ -11,7 +11,6 @@ import os
 from datetime import datetime, timedelta
 import json
 import pytz
-
 from schwab_enum import (AssetType, Instruction, OrderType, Market, SymbolId,
                          Fields, FrequencyType, Frequency, PeriodType, Period,
                          ContractType, Strategy, Range, ExpMonth, OptionType)
@@ -60,11 +59,43 @@ def read_json_file(file_path):
 
 config = read_json_file('schwab_config.json')
 
+
+StreamData = []
+
 #### API TEST
 from schwab_api import SchwabApi
 
 logger.info('Starting API session')
 api = SchwabApi(config)
+
+
+#### STREAMER
+def data_handler(contents: list):
+    StreamData.append(contents)
+
+    for data_dict in contents['data']:
+        service = data_dict['service']
+        command = data_dict['command']
+        timestamp = data_dict['timestamp']
+        logger.info('%s, %s, %s', service,command,timestamp)
+        # Iterar sobre la lista de diccionarios bajo la clave 'content'
+        for content_dict in data_dict['content']:
+            if service == 'ACCT_ACTIVITY':
+                json_str = content_dict['3']
+                if json_str.strip():
+                    content_dict['3'] = json.loads(json_str)
+
+            logger.info('%s', json.dumps(content_dict, indent=1))
+
+
+from schwab_streamer import SchwabStreamerClient
+
+streamer = SchwabStreamerClient(api, data_manager=data_handler)
+logger.info('Test Connect Streamer"')
+streamer.connect()
+logger.info('Test streaming "Account Acctivity"')
+streamer.subs_request_account_activity()
+
 
 #### ACCOUNT DATA
 logger.info('Testing "ACCOUNT DATA" endpoints')
@@ -167,7 +198,7 @@ instrument = api.get_instruments(cusip)
 logger.info('Instrument: %s', json.dumps(instrument, indent=1))
 
 logger.info('Testing "GET_MARKETS_HOURS" endpoint')
-markets_hours = api.get_markets_hours()
+markets_hours = api.get_markets_hours([Market.ALL])
 logger.info('Markets hours: %s', json.dumps(markets_hours['bond'], indent=1))
 
 logger.info('Testing "GET_MARKET_HOURS" endpoint')
@@ -193,7 +224,7 @@ logger.info('Pricehistory: %s', json.dumps(pricehistory_date['candles'][0], inde
 logger.info('Testing "GET_PRICEHISTORY_PERIOD" endpoint')
 pricehistory_period = api.get_pricehistory_period('AAPL', FrequencyType.DAY_MINUTE,
                                                   Frequency.MINUTE_15, PeriodType.DAY,
-                                                  Period.DAY_2)
+                                                  Period.DAY_5)
 logger.info('Pricehistory: %s', json.dumps(pricehistory_period['candles'][0], indent=1))
 
 logger.info('Testing "GET_QUOTE" endpoint')
@@ -244,13 +275,6 @@ logger.info('Option chain CALL: %s', json.dumps(first_record, indent=1))
 option_symbol = first_record['symbol']
 
 
-#### STREAMER
-
-from schwab_streamer import SchwabStreamerClient
-
-streamer = SchwabStreamerClient(api)
-
-streamer.connect()
 
 
 INDICATORS = '$DJI, $TICK'
@@ -259,7 +283,7 @@ FUTURES = '/ES, /CL, /BTC'
 
 EQUITIES = EQUITIES + ', '+ INDICATORS
 
-streamer.subs_request_account_activity()
+
 #streamer.subs_request_account_activity(command="UNSUBS")
 
 streamer.subs_request_chart_equity(keys = EQUITIES)
@@ -271,23 +295,25 @@ streamer.subs_request_levelone_forex(keys = 'EUR/USD')
 streamer.subs_request_levelone_options(keys = option_symbol)
 streamer.subs_request_levelone_future_options(keys = option_symbol)
 
-streamer.subs_request_nasdaq_book(keys = EQUITIES)
+streamer.subs_request_nasdaq_book()
 streamer.subs_request_options_book(keys = option_symbol)
+streamer.subs_request_nyse_book()
 
+streamer.subs_request_screener_equity()
+streamer.subs_request_screener_option(keys = option_symbol)
 
-#streamer._ws.send_qos_request('0')
+time.sleep(15)
+streamer.logout()
 
-#streamer.subs_request_timesale_equity(keys = EQUITIES) #not available
+#streamer.subs_request_listed_book()
+#streamer.subs_request_timesale_equity() #not available
 #streamer.subs_request_timesale_futures(keys = FUTURES) #not available
-#streamer.subs_request_timesale_options(keys = 'AAPL  240628C00100000') #not available
+#streamer.subs_request_timesale_options(keys = option_symbol) #not available
+#streamer.subs_request_news_headline() #not available
+#streamer._ws.send_qos_request('0')
 #streamer.subs_request_timesale_forex(keys = 'EUR/USD') #not available bad command formatting
-
 #streamer.subs_request_quote(keys = EQUITIES) #not available
-#streamer.subs_request_news_headline(keys = EQUITIES) #not available
-
 #streamer.subs_request_actives_nasdaq() #not available
 #streamer.subs_request_actives_nyse() #not available
 #streamer.subs_request_actives_otcbb() #not available
 #streamer.subs_request_actives_options() #not available
-
-#streamer.logout()

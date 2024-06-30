@@ -10,6 +10,8 @@ import json
 from typing import Optional, Dict, Any, Callable, List
 import urllib.parse as up
 import logging
+import asyncio
+import aiohttp
 import requests
 from schwab_auth import SchwabAuth
 from schwab_enum import (Status, TransactionType, AssetType, Instruction, Session, Duration,
@@ -36,22 +38,22 @@ class SchwabApi():
 
 	Performs request to the Schwab API. Response in JSON format.
     '''
-    def __init__(self, config):
+    def __init__(self, config, async_mode=False):
 
         '''
         Initialize object with provided account info
         Open Authentication object to have a valid access token for every request.
-
-        The following 2 lines create authentication object and run it.
-        It will be use in the headers method to send a valid token.
         '''
+        if async_mode:
+            self._make_request = self._make_request_async
+        else:
+            self._make_request = self._make_request_sync
 
         self._auth = SchwabAuth(config)
 
-        #self._auth.authenticate()
         if self._auth:
-            self.principals = self.get_user_preference()
-            accounts = self.get_account_numbers()
+            self.principals = self.get_user_preference()  # ver como agregar el await
+            accounts = self.get_account_numbers()         # ver como agregar el await
             self.account_hash = accounts[0]['hashValue']
 
             logger.info("Schwab API Initialized")
@@ -59,15 +61,17 @@ class SchwabApi():
             logger.warning("Could not authenticate")
 
 
+
+
     def __repr__(self):
         '''
         defines the string representation of our TD Ameritrade Class instance.
         '''
 
-        # define the string representation
+
         return str(self._auth)
 
-    def _make_request(self, method: Callable, base_url: str, endpoint: str,
+    def _make_request_sync(self, method: str, base_url: str, endpoint: str,
                       additional_headers: Optional[Dict[str, str]] = None, **kwargs: Any):
 
         headers = self._auth.get_headers()
@@ -76,7 +80,7 @@ class SchwabApi():
         url = up.urljoin(base_url, endpoint.lstrip('/'))
 
         try:
-            response = method(url, headers=headers, verify=True, timeout=30, **kwargs)
+            response = requests.request(method, url, headers=headers, verify=True, timeout=30, **kwargs)
             response.raise_for_status()
             if response.content:
                 return response.json()
@@ -86,6 +90,26 @@ class SchwabApi():
             logger.error("Error: %s, Response: %s", error, response.json())
             return None
 
+    async def _make_request_async(self, method: str, base_url: str, endpoint: str,
+                      additional_headers: Optional[Dict[str, str]] = None, **kwargs: Any):
+
+        headers = self._auth.get_headers()
+        if additional_headers:
+            headers.update(additional_headers)
+        url = up.urljoin(base_url, endpoint.lstrip('/'))
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.request(method, url, headers=headers, verify_ssl=True,
+                                           timeout=30, **kwargs) as response:
+                    response.raise_for_status()
+                    if response.content_type == 'application/json':
+                        return await response.json()
+                    return await response.text()
+
+        except aiohttp.ClientError as error:
+            logger.error("Error: %s", error)
+            return None
 
     ########## Public services
 
@@ -120,7 +144,7 @@ class SchwabApi():
 
         endpoint = '/userPreference'
 
-        return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
+        return self._make_request('get', BASE_TRADER_URL, endpoint)
 
 
     #### Account
@@ -134,7 +158,7 @@ class SchwabApi():
         '''
         endpoint = '/accounts/accountNumbers'
 
-        return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
+        return self._make_request('get', BASE_TRADER_URL, endpoint)
 
 
     def get_accounts(self, *, account_hash: Optional[str] = None, fields: Optional[str] = None):
@@ -176,7 +200,7 @@ class SchwabApi():
         else:
             endpoint = '/accounts'
 
-        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
+        return self._make_request('get', BASE_TRADER_URL, endpoint, params = params)
 
 
     #### Transaction History
@@ -229,7 +253,7 @@ class SchwabApi():
 
             endpoint = f'/accounts/{account_hash}/transactions/{transaction_id}'
 
-            return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
+            return self._make_request('get', BASE_TRADER_URL, endpoint)
 
         params = {'types':transaction_type.value,
                 'symbol':symbol,
@@ -238,7 +262,7 @@ class SchwabApi():
 
         endpoint = f'/accounts/{account_hash}/transactions'
 
-        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
+        return self._make_request('get', BASE_TRADER_URL, endpoint, params = params)
 
 
     #### Orders
@@ -265,7 +289,7 @@ class SchwabApi():
                 "toEnteredTime": to_entered_datetime,
                 "status": status.value}
 
-        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
+        return self._make_request('get', BASE_TRADER_URL, endpoint, params = params)
 
 
 
@@ -335,7 +359,7 @@ class SchwabApi():
 
         endpoint = f'/accounts/{account_hash}/orders'
 
-        return self._make_request(requests.get, BASE_TRADER_URL, endpoint, params = params)
+        return self._make_request('get', BASE_TRADER_URL, endpoint, params = params)
 
 
     def get_order(self, order_id, account_hash = None):
@@ -361,7 +385,7 @@ class SchwabApi():
 
         endpoint = f'/accounts/{account_hash}/orders/{order_id}'
 
-        return self._make_request(requests.get, BASE_TRADER_URL, endpoint)
+        return self._make_request('get', BASE_TRADER_URL, endpoint)
 
 
     def cancel_order(self, order_id, account_hash = None):
@@ -390,7 +414,7 @@ class SchwabApi():
         endpoint = f'/accounts/{account_hash}/orders/{order_id}'
 
         #make the request
-        response = self._make_request(requests.delete, BASE_TRADER_URL, endpoint)
+        response = self._make_request('delete', BASE_TRADER_URL, endpoint)
 
         if response and response.status_code == 200:
             logger.info("Order %s was successfully CANCELED.", order_id)
@@ -519,7 +543,7 @@ class SchwabApi():
             account_hash = account_hash or self.account_hash
             endpoint = f'/accounts/{account_hash}/orders'
 
-            response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
+            response = self._make_request('post', BASE_TRADER_URL, endpoint,
                                           ADDITIONAL_HEADERS, data = json.dumps(payload))
 
 
@@ -594,7 +618,7 @@ class SchwabApi():
             account_hash = account_hash or self.account_hash
             endpoint = f'/accounts/{account_hash}/orders/{order_id}'
 
-            response = self._make_request(requests.put, BASE_TRADER_URL, endpoint,
+            response = self._make_request('put', BASE_TRADER_URL, endpoint,
                                           ADDITIONAL_HEADERS, data=json.dumps(payload))
 
             if response and response.status_code == 201:
@@ -667,7 +691,7 @@ class SchwabApi():
             account_hash = account_hash or self.account_hash
             endpoint = f'/accounts/{account_hash}/previewOrder'
 
-            response = self._make_request(requests.post, BASE_TRADER_URL, endpoint,
+            response = self._make_request('post', BASE_TRADER_URL, endpoint,
                                           ADDITIONAL_HEADERS, data = json.dumps(payload))
 
             if response and response.status_code == 201:
@@ -737,7 +761,7 @@ class SchwabApi():
         endpoint = '/instruments'
 
         # return the response of the get request.
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
 
     def get_instruments(self, cusip_id):
@@ -760,11 +784,11 @@ class SchwabApi():
         endpoint = f'/instruments/{cusip_id}'
 
         # return the resposne of the get request.
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint)
+        return self._make_request('get', BASE_MARKET_URL, endpoint)
 
     ####  Market Hours
 
-    def get_markets_hours(self, markets: List[Market] = None, date = None):
+    def get_markets_hours(self, markets: List[Market], date = None):
 
         '''
         Retrieve market hours for specified markets
@@ -790,7 +814,7 @@ class SchwabApi():
 
         endpoint = '/markets'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
 
     def get_market_hours(self, market_id: Market, date = None):
@@ -816,7 +840,7 @@ class SchwabApi():
 
         endpoint = f'/markets/{market_id}'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
 
     #### Movers
@@ -845,7 +869,7 @@ class SchwabApi():
 
         endpoint = f'/movers/{index.value}'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
 
     #### Quotes
@@ -877,7 +901,7 @@ class SchwabApi():
 
         endpoint = '/quotes'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
     def get_quote(self, symbol_id, fields: Fields = Fields.ALL):
 
@@ -885,7 +909,7 @@ class SchwabApi():
         params = {'fields': fields.value}
         endpoint = f'/{symbol_id}/quotes'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
 
     #### Price History
@@ -959,7 +983,7 @@ class SchwabApi():
 
         endpoint = '/pricehistory'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
 
     def get_pricehistory_dates(self, symbol,
@@ -1008,7 +1032,7 @@ class SchwabApi():
         # define the endpoint
         endpoint = '/pricehistory'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
 
     #### Option Chain
@@ -1063,7 +1087,7 @@ class SchwabApi():
         #define the endpoint
         endpoint = '/chains'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)
 
     def get_option_expirationchain(self, symbol):
 
@@ -1071,4 +1095,4 @@ class SchwabApi():
 
         endpoint = '/expirationchain'
 
-        return self._make_request(requests.get, BASE_MARKET_URL, endpoint, params = params)
+        return self._make_request('get', BASE_MARKET_URL, endpoint, params = params)

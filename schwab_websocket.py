@@ -54,8 +54,8 @@ class SchwabWebSocket:
 
         # Define a dictionary that defines response types
         self.response_types = {'notify': [], 'response': [], 'snapshot': [], 'data': []}
-        self.current_subscriptions = []
-        self.temp_subscriptions = []
+        self.active_subscriptions = []
+        self.pending_subscription_requests = []
         self.stream_delay = 0
         self.download_rate = 0
         self.timeoffset = 0
@@ -127,7 +127,7 @@ class SchwabWebSocket:
         It will follow the same sequence of subscriptions and unsubcriptions
         '''
 
-        subscriptions = self.current_subscriptions
+        subscriptions = self.active_subscriptions
         for subs in subscriptions:
             self.send_subscription_request(subs)
 
@@ -280,7 +280,7 @@ class SchwabWebSocket:
         if ((content['response'][0]['command'] == 'LOGIN') and
             (content['response'][0]['content']['code'] == 0)):
             self.is_logged_in = True
-
+            print(str(content))
             now = datetime.now()
 
             time_diff = now - response_time
@@ -301,27 +301,27 @@ class SchwabWebSocket:
             service = content['response'][0]['service']
             command = content['response'][0]['command']
 
-            matching_temp_subscription = next((sub for sub in self.temp_subscriptions
+            matched_pending_subscription = next((sub for sub in self.pending_subscription_requests
                                                if sub[0] == service), None)
 
             if content['response'][0]['content']['msg'][-17:] == "command succeeded":
 
 
-                matching_current_subscription = next((sub for sub in self.current_subscriptions
+                matched_active_subscription = next((sub for sub in self.active_subscriptions
                                                       if sub[0] == service), None)
 
 
 
-                if command == "SUBS" and not matching_current_subscription:
-                    self.current_subscriptions.append(matching_temp_subscription)
+                if command == "SUBS" and not matched_active_subscription:
+                    self.active_subscriptions.append(matched_pending_subscription)
 
-                elif command == "UNSUBS" and matching_current_subscription:
-                    self.current_subscriptions.remove(matching_current_subscription)
+                elif command == "UNSUBS" and matched_active_subscription:
+                    self.active_subscriptions.remove(matched_active_subscription)
 
                 elif command == "ADD":
-                    self.current_subscriptions.append(matching_temp_subscription)
+                    self.active_subscriptions.append(matched_pending_subscription)
 
-            self.temp_subscriptions.remove(matching_temp_subscription)
+            self.pending_subscription_requests.remove(matched_pending_subscription)
 
         self.response_types['response'].append(content)
 
@@ -384,10 +384,11 @@ class SchwabWebSocket:
         '''
         self._user_logoff = True
 
+
         if self.is_logged_in:
 
             self.is_logged_in = False
-            self.current_subscriptions = []
+            self.active_subscriptions = []
 
             logout_request = {
                 "service": "ADMIN",
@@ -398,12 +399,14 @@ class SchwabWebSocket:
                 }
 
             self.websocket.send(json.dumps(logout_request))
+            session_duration =  datetime.now() - self.logged_in_since
             logger.info('Client is logged out.')
+            logger.info('Session duration: %s', session_duration)
+            self.logged_in_since = None
             self.websocket.close()
 
         else:
             logger.warning('Client is already logged out.')
-
 
 
     def send_qos_request(self, qoslevel: str = '0') -> None:
@@ -453,7 +456,7 @@ class SchwabWebSocket:
         '''
         Method for subscription handler
         '''
-        self.temp_subscriptions.append(subscription)
+        self.pending_subscription_requests.append(subscription)
 
         subs_request= {
                        "service": subscription[0],
